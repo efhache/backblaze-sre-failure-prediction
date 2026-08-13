@@ -47,3 +47,14 @@ po/*~
 
 # RStudio Connect folder
 rsconnect/
+
+# Dossiers de données volumineux à ignorer
+data/
+*.csv
+*.rds
+*.parquet
+
+# Fichiers temporaires R
+.Rhistory
+.RData
+.Rproj.user/
