@@ -84,7 +84,7 @@ dt_list <- lapply(csv_files, function(file) {
   fread(file, select = keep_cols, showProgress = FALSE)
 })
 
-# Fast ingestion and column selection only
+# Merging tables into a single data.table
 dt_raw <- rbindlist(dt_list, fill = TRUE)
 rm(dt_list) # Immediate memory release
 gc()
