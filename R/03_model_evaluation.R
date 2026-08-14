@@ -62,7 +62,7 @@ p_roc <- ggplot(df_roc, aes(x = FPR, y = TPR, color = Model)) +
   ) +
   theme(legend.position = "bottom")
 
-ggsave(file.path(PATH_FIGS, "fig4_roc_curves_comparison.png"), plot = p_roc, width = 8, height = 6, dpi = 300)
+ggsave(file.path(PATH_FIGS, "fig7_roc_curves_comparison.png"), plot = p_roc, width = 8, height = 6, dpi = 300)
 
 # ==============================================================================
 # 3. Precision-Recall Curve (Critical for Extreme Class Imbalance)
@@ -84,7 +84,7 @@ p_pr <- ggplot(df_pr, aes(x = Recall, y = Precision)) +
     y = "Precision"
   )
 
-ggsave(file.path(PATH_FIGS, "fig5_precision_recall_curve.png"), plot = p_pr, width = 8, height = 6, dpi = 300)
+ggsave(file.path(PATH_FIGS, "fig8_precision_recall_curve.png"), plot = p_pr, width = 8, height = 6, dpi = 300)
 
 # ==============================================================================
 # 4. Export Summary Table for Thesis Report
