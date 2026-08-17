@@ -2,7 +2,6 @@
 # Script: 04_sre_cost_analysis.R
 # Project: Predictive Hard Drive Failure Modelling for SRE Operations
 # Description: SRE Cost-Benefit Analysis & Economic Sensitivity Analysis
-# Standard: HarvardX / edX Data Science Capstone Standards
 # ==============================================================================
 
 # 0. Load Libraries

@@ -2,7 +2,6 @@
 # Script: 03_model_evaluation.R
 # Project: Predictive Hard Drive Failure Modelling for SRE Operations
 # Description: Model Evaluation (AUC-ROC, Precision-Recall, SRE Cost Curves)
-# Standard: HarvardX / edX Data Science Capstone Standards
 # ==============================================================================
 
 # 0. Load Libraries

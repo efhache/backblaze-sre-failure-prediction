@@ -1,8 +1,7 @@
 # ==============================================================================
 # Script: 01_eda_and_processing.R
 # Project: Predictive Hard Drive Failure Modelling for SRE Operations
-# Description: Optimised data ingestion, exploration (EDA) and data preparation
-# Phase 1 : preparation
+# Description: Optimised data ingestion, exploration (EDA) and data preparatio
 # ==============================================================================
 
 # 1. Loading the required packages
@@ -84,7 +83,7 @@ dt_list <- lapply(csv_files, function(file) {
   fread(file, select = keep_cols, showProgress = FALSE)
 })
 
-# Merging tables into a single data.table
+# Fast ingestion and column selection only
 dt_raw <- rbindlist(dt_list, fill = TRUE)
 rm(dt_list) # Immediate memory release
 gc()

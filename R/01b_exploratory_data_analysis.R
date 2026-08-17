@@ -2,7 +2,6 @@
 # Script: 01b_exploratory_data_analysis.R
 # Project: Predictive Hard Drive Failure Modelling for SRE Operations
 # Description: Exploratory Data Analysis (EDA) & Feature Distributions
-# Standard: HarvardX / edX Data Science Capstone Standards
 # ==============================================================================
 
 # 0. Load Libraries
