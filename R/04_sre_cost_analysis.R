@@ -32,11 +32,11 @@ preds_dt <- readRDS(INPUT_PREDS)
 # ==============================================================================
 run_cost_optimization <- function(preds_dt, cost_fn, cost_fp, cost_tp, scenario_label) {
   
-  # 1. Calcul de la probabilité calibrée (Correction de l'échelle XGBoost)
+  # 1. Calculation of the calibrated probability (XGBoost scale correction)
   POS_WEIGHT <- (1 - 0.0004) / 0.0004 
   y_prob <- preds_dt$pred_xgb / (preds_dt$pred_xgb + ((1 - preds_dt$pred_xgb) * POS_WEIGHT))
   
-  # 2. Balayage des seuils adaptés aux probabilités calibrées très faibles
+  # 2. Threshold scanning adapted to very low calibrated probabilities
   thresholds <- unique(c(
     seq(0.000001, 0.0001, length.out = 100),
     seq(0.0001, 0.01, length.out = 100),
@@ -126,9 +126,9 @@ cat(sprintf("[Scenario B] Reactive Cost: $%s | ML Optimal Cost: $%s | Savings: $
 # ==============================================================================
 plot_scenario <- function(res, subtitle_text) {
   
-  # Calcul dynamique de la borne supérieure : 
-  # On fixe le plafond du graphique à 2x le coût réactif pour toujours voir
-  # la ligne rouge et le creux d'optimisation, sans écraser la courbe.
+  # Dynamic calculation of the upper bound:
+  # We set the upper limit of the graph to 2x the reactive cost so that
+  # the red line and the optimisation trough are always visible, without the curve being obscured.
   y_upper_limit <- res$reactive_cost * 2.0
   
   ggplot(res$cost_df[threshold <= 0.01], aes(x = threshold, y = total_cost)) +
@@ -143,7 +143,7 @@ plot_scenario <- function(res, subtitle_text) {
              label = "Reactive Strategy (No ML)", color = "#e74c3c", fontface = "italic") +
     scale_y_continuous(labels = dollar_format()) +
     scale_x_continuous(labels = percent_format(accuracy = 0.01)) +
-    # Zoom dynamique sans suppression de données
+    # Dynamic zoom without data loss
     coord_cartesian(ylim = c(0, y_upper_limit)) +
     labs(
       title = res$optimal_row$Scenario[1],

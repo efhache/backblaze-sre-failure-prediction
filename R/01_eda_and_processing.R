@@ -80,7 +80,12 @@ if (length(csv_files) == 0) {
 
 # Fast ingestion and column selection only
 dt_list <- lapply(csv_files, function(file) {
-  fread(file, select = keep_cols, showProgress = FALSE)
+  fread(
+    file, 
+    select = keep_cols, 
+    colClasses = c(capacity_bytes = "numeric"), # Force la lecture en double/64-bit
+    showProgress = FALSE
+  )
 })
 
 # Fast ingestion and column selection only
@@ -169,7 +174,7 @@ print(table(dt_filtered$target_14d, useNA = "ifany"))
 cat(sprintf("\nSaving processed dataset to %s...\n", OUTPUT_FILEPATH))
 
 # Using 'xz' compression for optimal RAM & Disk efficiency on VM
-saveRDS(dt_filtered, file = output_path, compress = "xz")
+saveRDS(dt_filtered, file = OUTPUT_FILEPATH, compress = "xz")
 
 cat("Processing completed successfully!\n")
 gc()

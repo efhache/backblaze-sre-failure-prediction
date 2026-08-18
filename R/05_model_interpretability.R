@@ -2,7 +2,6 @@
 # Script: 05_model_interpretability.R
 # Project: Predictive Hard Drive Failure Modelling for SRE Operations
 # Description: Model Interpretability (Native XGBoost SHAP & Feature Importance)
-# Standard: HarvardX / edX Data Science Capstone Standards
 # ==============================================================================
 
 # 0. Load Libraries
@@ -38,13 +37,13 @@ input_filepath <- file.path(PATH_PROCESSED, sprintf("dt_processed_%s.rds", tolow
 dt <- readRDS(input_filepath)
 dt[, date := as.IDate(date)]
 
-# Split temporel identique au Script 02
+# Time split identical to Script 02 model training
 cutoff_date <- as.IDate("2024-03-01")
 test_dt     <- dt[date >= cutoff_date]
 rm(dt)
 gc()
 
-# Calcul des variables dérivées identiques
+# Calculation of identical derived variables
 test_dt[, capacity_tb := capacity_bytes / 1e12]
 
 feature_cols <- c(
@@ -53,7 +52,7 @@ feature_cols <- c(
   "smart_5_delta7", "smart_187_delta7", "smart_197_delta7"
 )
 
-# Imputation des NA par 0
+# Allocation of NA by 0
 for (j in feature_cols) {
   set(test_dt, which(is.na(test_dt[[j]])), j, 0)
 }
@@ -78,13 +77,13 @@ sample_size <- min(20000, nrow(X_test))
 sample_idx  <- sample(seq_len(nrow(X_test)), size = sample_size)
 X_sample    <- X_test[sample_idx, ]
 
-# Contribution SHAP native par arbre XGBoost
+# Native SHAP contribution per XGBoost tree
 shap_contrib <- predict(model_xgb, newdata = X_sample, predcontrib = TRUE)
 
-# Extraction des contributions (sans la colonne BIAS)
+# Extracting contributions (excluding the BIAS column)
 shap_matrix <- shap_contrib[, -ncol(shap_contrib)]
 
-# Mean Absolute SHAP Value par variable
+# Mean Absolute SHAP Value by variable
 mean_shap <- colMeans(abs(shap_matrix))
 shap_summary_df <- data.table(
   Feature = names(mean_shap),

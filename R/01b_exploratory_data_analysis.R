@@ -138,22 +138,22 @@ cat("--- Generating Figure 4: S.M.A.R.T. Correlation Heatmap ---\n")
 
 smart_cols <- c("smart_5_raw", "smart_9_raw", "smart_187_raw", "smart_188_raw", "smart_194_raw", "smart_197_raw", "smart_198_raw")
 
-# Échantillonnage de 50 000 lignes
+# A sample of 50,000 lines
 set.seed(42)
 sample_size <- min(50000, nrow(dt))
 cor_dt_sample <- dt[sample(.N, sample_size), smart_cols, with = FALSE]
 
-# Nettoyage colonne par colonne (évite d'applatir le data.table)
+# Cleaning column by column (avoids flattening the data.table)
 for (col in smart_cols) {
   val <- cor_dt_sample[[col]]
   val[is.na(val) | val < 0] <- 0
   set(cor_dt_sample, j = col, value = log1p(val))
 }
 
-# Calcul de la matrice Spearman
+# Calculation of the Spearman matrix
 cor_mat <- cor(as.matrix(cor_dt_sample), method = "spearman")
 
-# Conversion propre 2D vers format long pour ggplot2
+# Custom 2D-to-long format conversion for ggplot2
 cor_df <- expand.grid(Var1 = smart_cols, Var2 = smart_cols, KEEP.OUTATTRS = FALSE)
 cor_df$value <- as.vector(cor_mat)
 
@@ -203,20 +203,20 @@ rm(daily_trend)
 # ==============================================================================
 cat("--- Generating Figure 6: Failure Rate by Drive Capacity ---\n")
 
-# Filtrage des capacités invalides/négatives (-1)
+# Filtering out invalid/negative capacities (-1)
 dt_cap <- copy(dt[!is.na(capacity_bytes) & capacity_bytes > 0])
 
-# Conversion dynamique en TB
+# Dynamic conversion to TB
 dt_cap[, capacity_tb := round(as.numeric(capacity_bytes) / 1e12)]
 
-# Agrégation par capacité
+# Aggregation by capacity
 cap_stats <- dt_cap[capacity_tb > 0, .(
   Total_Obs = .N,
   Failures = sum(as.numeric(failure), na.rm = TRUE),
   Failure_Rate_pct = (sum(as.numeric(failure), na.rm = TRUE) / .N) * 100
 ), by = capacity_tb][order(capacity_tb)]
 
-# Récupération dynamique de la liste des capacités pour le sous-titre (ex: "12TB, 14TB, 16TB, 20TB")
+# Dynamic retrieval of the list of capacities for the subtitle (e.g. ‘12TB, 14TB, 16TB, 20TB’)
 cap_list_str <- paste0(cap_stats$capacity_tb, "TB", collapse = ", ")
 sub_title_f6 <- sprintf("Comparison across detected operational drive sizes (%s)", cap_list_str)
 
