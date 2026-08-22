@@ -23,6 +23,7 @@ gc()
 DATASET_TAG    <- "Q1_2024"
 PATH_PROCESSED <- "data/processed/"
 PATH_MODELS    <- "outputs/models/"
+PATH_METRICS <- "outputs/metrics/"
 
 if (!dir.exists(PATH_MODELS)) dir.create(PATH_MODELS, recursive = TRUE)
 
@@ -201,6 +202,25 @@ xgb_model <- xgb.train(
   early_stopping_rounds = 10,
   print_every_n         = 20
 )
+
+# Feature Importance & Metrics Export
+importance_matrix <- xgb.importance(model = xgb_model)
+
+engineered_cols <- c("smart_5_delta7", "smart_187_delta7", "smart_197_delta7")
+gain_engineered <- sum(importance_matrix[Feature %in% engineered_cols, Gain])
+gain_total      <- sum(importance_matrix$Gain)
+
+feature_importance_engineered <- gain_engineered / gain_total
+
+if (!dir.exists(PATH_METRICS)) dir.create(PATH_METRICS, recursive = TRUE) # Ensure that the metrics directory exists
+write.csv(
+  data.frame(feature_importance_engineered = feature_importance_engineered),
+  file.path(PATH_METRICS, "feature_importance_summary.csv"),
+  row.names = FALSE
+)
+# Explicit memory clearance
+rm(importance_matrix, gain_engineered, gain_total, engineered_cols)
+gc(verbose = FALSE)
 
 # Predict probabilities on FULL Test Set
 test_dt[, pred_xgb := predict(xgb_model, dtest)]

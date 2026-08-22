@@ -98,5 +98,8 @@ summary_table <- data.table(
 
 write.csv(summary_table, file.path(PATH_METRICS, "model_performance_summary.csv"), row.names = FALSE)
 
+rm(roc_lr, roc_xgb, pr_xgb, df_roc_lr, df_roc_xgb, df_roc, df_pr, p_roc, p_pr)
+gc(verbose = FALSE)
 cat("\nSummary of results exported to 'outputs/metrics/model_performance_summary.csv'\n")
+
 cat("Phase 4 Model Evaluation completed successfully!\n")

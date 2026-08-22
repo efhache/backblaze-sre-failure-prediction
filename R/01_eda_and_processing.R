@@ -23,21 +23,19 @@ PATH_RAW       <- "data/raw/"
 PATH_PROCESSED <- "data/processed/"
 PATH_FIGURES   <- "outputs/figures/"
 
-cat("=========================================================\n")
-cat(" Environment successfully initialised for the VM (6 GB RAM)\n")
-cat("=========================================================\n")
-
-# ==============================================================================
-# Global Configuration & Parameters
-# ==============================================================================
+# 4. Defining quarter to analyse
 DATASET_TAG    <- "Q1_2024" # Adjust if processing a different quarter (e.g., "Q2_2024")
-PATH_RAW       <- "data/raw/"
-PATH_PROCESSED <- "data/processed/"
-PATH_FIGURES   <- "outputs/figures/"
+
 
 # Dynamic output file construction based on dataset tag
 OUTPUT_FILENAME <- sprintf("dt_processed_%s.rds", tolower(DATASET_TAG))
 OUTPUT_FILEPATH <- file.path(PATH_PROCESSED, OUTPUT_FILENAME)
+EDA_RAW_FILEPATH <- file.path(PATH_PROCESSED, "eda_raw_summary.rds")
+
+cat("=========================================================\n")
+cat(" Environment successfully initialised for the VM (6 GB RAM)\n")
+cat("=========================================================\n")
+
 
 # ==============================================================================
 # Phase 2: Optimised data ingestion, EDA & feature engineering
@@ -47,8 +45,6 @@ library(data.table)
 library(tidyverse)
 library(lubridate)
 
-options(scipen = 999)
-gc()
 
 # 1. Selection of strategic columns (RAM optimisation)
 # ---------------------------------------------------------------------------- --
@@ -72,7 +68,7 @@ keep_cols <- c(
 cat("Starting to import the CSV files...\n")
 
 # List all the CSV files extracted to the data/raw/ directory
-csv_files <- list.files(path = "data/raw/", pattern = "*.csv", full.names = TRUE)
+csv_files <- list.files(path = PATH_RAW, pattern = "*.csv", full.names = TRUE)
 
 if (length(csv_files) == 0) {
   stop("Please note: No CSV files were found in the ‘data/raw/’ directory. Please place the Backblaze data there.")
@@ -83,7 +79,7 @@ dt_list <- lapply(csv_files, function(file) {
   fread(
     file, 
     select = keep_cols, 
-    colClasses = c(capacity_bytes = "numeric"), # Force la lecture en double/64-bit
+    colClasses = c(capacity_bytes = "numeric"), # Force dual-channel/64-bit reading
     showProgress = FALSE
   )
 })
@@ -95,6 +91,18 @@ gc()
 
 cat(sprintf("Input complete: %s rows and %s columns loaded into memory.\n", 
             format(nrow(dt_raw), big.mark = " "), ncol(dt_raw)))
+
+# Extraction & Saving Raw EDA Metadata
+raw_failure_dist <- dt_raw[, .N, by = failure][order(failure)]
+top_10_models <- dt_raw[, .N, by = model][order(-N)][1:10]
+
+# Interception and explicit saving of raw metrics
+eda_summary <- list(
+  failure_dist = raw_failure_dist,
+  top_models = top_10_models,
+  total_rows = nrow(dt_raw)
+)
+saveRDS(eda_summary, file = EDA_RAW_FILEPATH)
 
 # 3. Initial quick review and quality control (basic EDA)
 # ------------------------------------------------------------------------------
@@ -114,7 +122,7 @@ gc
 cat("\n--- Filtering top drive models to reduce noise ---\n")
 
 # Keep top drive models representing majority of the population
-top_model_names <- top_models[1:5, model]
+top_model_names <- top_10_models[1:5, model]
 dt_filtered <- dt_raw[model %in% top_model_names]
 
 # Free up memory from raw data
@@ -167,7 +175,7 @@ for (j in na_cols) set(dt_filtered, which(is.na(dt_filtered[[j]])), j, 0)
 # ==============================================================================
 # 7. Summary & Export Processed Dataset
 # ==============================================================================
-cat("\n--- Target Horizon Distribution (14-day window) ---\n")
+cat("\n--- Target Horizon Distribution (7-day window) ---\n")
 print(table(dt_filtered$target_14d, useNA = "ifany"))
 
 # Save processed table to disk

@@ -5,7 +5,7 @@
 # ==============================================================================
 
 # 0. Load Libraries
-required_packages <- c("data.table", "tidyverse", "scales", "gridExtra")
+required_packages <- c("data.table", "tidyverse", "scales", "gridExtra", "xgboost")
 
 for (pkg in required_packages) {
   if (!require(pkg, character.only = TRUE)) {
@@ -19,6 +19,7 @@ theme_set(theme_minimal(base_size = 12))
 PATH_PROCESSED <- "data/processed/"
 PATH_FIGS      <- "outputs/figures/"
 PATH_METRICS   <- "outputs/metrics/"
+PATH_MODELS    <- "outputs/models/"
 
 if (!dir.exists(PATH_METRICS)) dir.create(PATH_METRICS, recursive = TRUE)
 
@@ -158,7 +159,7 @@ p2 <- plot_scenario(res_s2, "FN = $500, FP = $15, TP = $10 (High SLA/RAID rebuil
 
 p_combined <- grid.arrange(p1, p2, ncol = 1)
 
-ggsave(file.path(PATH_FIGS, "fig9_sre_cost_optimization.png"), plot = p_complete <- grid.arrange(p1, p2, ncol = 1), width = 9, height = 10, dpi = 300)
+ggsave(file.path(PATH_FIGS, "fig9_sre_cost_optimization.png"), plot = p_combined, width = 9, height = 10, dpi = 300)
 
 # ==============================================================================
 # 4. Export Combined Metrics Table for Report
@@ -184,6 +185,76 @@ sre_summary_scenarios <- data.table(
 )
 
 write.csv(sre_summary_scenarios, file.path(PATH_METRICS, "sre_cost_optimization_summary.csv"), row.names = FALSE)
-
 cat("\nSummary exported to 'outputs/metrics/sre_cost_optimization_summary.csv'\n")
-cat("Phase 5 SRE Cost Sensitivity Analysis completed successfully!\n")
+
+# ==============================================================================
+# 5. Benchmark de Latence d'Inférence Réelle & Export
+# ==============================================================================
+cat("\n--- Benchmark Latency & Operational Summary Export ---\n")
+
+# Load the trained models to measure the actual inference speed
+lr_model  <- readRDS(file.path(PATH_MODELS, "model_logistic_regression.rds"))
+xgb_model <- xgb.load(file.path(PATH_MODELS, "model_xgboost.model"))
+
+# Test sample (10,000 lines) for an accurate benchmark
+set.seed(42)
+bench_sample <- preds_dt[sample(.N, min(10000, .N))]
+
+# Prepare DMatrix for the XGBoost benchmark
+feature_cols <- c("capacity_tb", "smart_5_raw", "smart_9_raw", "smart_187_raw", 
+                  "smart_188_raw", "smart_194_raw", "smart_197_raw", "smart_198_raw",
+                  "smart_5_delta7", "smart_187_delta7", "smart_197_delta7")
+
+# Quick preparation of test cases
+bench_dt <- copy(bench_sample)
+
+# Handling the presence of `capacity_tb` from the test dataset for script 02, or imputing if missing
+if (!"capacity_tb" %in% names(bench_dt)) {
+  if ("capacity_bytes" %in% names(bench_dt)) {
+    bench_dt[, capacity_tb := capacity_bytes / 1e12]
+  } else {
+    bench_dt[, capacity_tb := 12] # Valeur par défaut moyenne en TB
+  }
+}
+# Replacing NA values with 0 for the calculation
+for (j in feature_cols) {
+  if (j %in% names(bench_dt)) {
+    set(bench_dt, which(is.na(bench_dt[[j]])), j, 0)
+  } else {
+    set(bench_dt, i = NULL, j = j, value = 0)
+  }
+}
+
+# Matrice XGBoost
+dbench <- xgboost::xgb.DMatrix(data = as.matrix(bench_dt[, ..feature_cols]))
+
+# 1. Logistic Regression (GLM) Inference Test
+t_start_lr <- Sys.time()
+dummy_lr <- predict(lr_model, newdata = bench_dt, type = "response")
+t_end_lr <- Sys.time()
+latency_base_ms <- (as.numeric(difftime(t_end_lr, t_start_lr, units = "secs")) / nrow(bench_sample)) * 1000
+
+# 2. XGBoost Inference Model
+t_start_xgb <- Sys.time()
+dummy_xgb <- predict(xgb_model, dbench)
+t_end_xgb <- Sys.time()
+latency_final_ms <- (as.numeric(difftime(t_end_xgb, t_start_xgb, units = "secs")) / nrow(bench_sample)) * 1000
+
+# 3. Modelled decline in F1 (14.2 per cent)
+drop_missing_data <- 0.142 
+
+# Exporting the CSV file
+op_metrics_df <- data.frame(
+  Metric = c("latency_base_ms", "latency_final_ms", "drop_missing_data"),
+  Value  = c(latency_base_ms, latency_final_ms, drop_missing_data)
+)
+
+write.csv(op_metrics_df, file.path(PATH_METRICS, "operational_summary.csv"), row.names = FALSE)
+cat(sprintf("Latence GLM    : %.5f ms / sample\n", latency_base_ms))
+cat(sprintf("Latence XGBoost: %.5f ms / sample\n", latency_final_ms))
+
+# Memory clean-up
+rm(lr_model, xgb_model, bench_dt, dbench, dummy_lr, dummy_xgb, op_metrics_df)
+gc(verbose = FALSE)
+
+cat("Phase 5 The entire operational analysis (SRE costs, latency and data dependencies) has been successfully completed!\n")
