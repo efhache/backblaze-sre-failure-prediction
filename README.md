@@ -29,7 +29,7 @@ This repository presents an end-to-end, cost-sensitive machine learning framewor
 
 | Performance Metrics (ROC & PR) | Cost-Sensitive Threshold Optimization |
 | :---: | :---: |
-| ![Model Performance](figures/fig05_model_performance.png) | ![SRE Cost Matrix](figures/fig06_cost_optimization.png) |
+| ![Model Performance](./outputs/figures/fig7_roc_curves_comparison.png) | ![SRE Cost Matrix](./outputs/figures/fig9_sre_cost_optimization.png) |
 | **Model Discrimination:** XGBoost achieves **AUC-ROC 0.8364** and **PR-AUC 0.0516** (~129x precision lift) under extreme class imbalance ($0.04\%$). | **SRE Economic Optimization:** Threshold tuning minimizes total operational costs ($C_{FN} = \$500$ vs $C_{FP} = \$10$) by balancing emergency toil and proactive data evacuation. |
 
 ---
