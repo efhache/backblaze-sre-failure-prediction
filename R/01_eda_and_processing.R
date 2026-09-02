@@ -175,7 +175,7 @@ for (j in na_cols) set(dt_filtered, which(is.na(dt_filtered[[j]])), j, 0)
 # ==============================================================================
 # 7. Summary & Export Processed Dataset
 # ==============================================================================
-cat("\n--- Target Horizon Distribution (7-day window) ---\n")
+cat("\n--- Target Horizon Distribution (14-day window) ---\n")
 print(table(dt_filtered$target_14d, useNA = "ifany"))
 
 # Save processed table to disk

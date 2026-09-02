@@ -136,7 +136,16 @@ ggsave(file.path(PATH_FIGS, "fig3_smart_features_distribution.png"), plot = p3_c
 # ==============================================================================
 cat("--- Generating Figure 4: S.M.A.R.T. Correlation Heatmap ---\n")
 
-smart_cols <- c("smart_5_raw", "smart_9_raw", "smart_187_raw", "smart_188_raw", "smart_194_raw", "smart_197_raw", "smart_198_raw")
+# Targeted list: 5 critical failure attributes + 2 checks + key deltas + target
+smart_cols <- c(
+  "smart_5_raw", "smart_187_raw", "smart_196_raw", "smart_197_raw", "smart_198_raw", # Critiques bruts
+  "smart_9_raw", "smart_194_raw",                                                  # Contrôles
+  "smart_5_delta7", "smart_187_delta7", "smart_197_delta7"                         # Deltas
+)
+
+# Retain only the columns actually present in the dt dataset
+smart_cols <- intersect(smart_cols, names(dt))
+#smart_cols <- c("smart_5_raw", "smart_9_raw", "smart_187_raw", "smart_188_raw", "smart_194_raw", "smart_197_raw", "smart_198_raw")
 
 # A sample of 50,000 lines
 set.seed(42)
@@ -145,17 +154,24 @@ cor_dt_sample <- dt[sample(.N, sample_size), smart_cols, with = FALSE]
 
 # Cleaning column by column (avoids flattening the data.table)
 for (col in smart_cols) {
-  val <- cor_dt_sample[[col]]
-  val[is.na(val) | val < 0] <- 0
-  set(cor_dt_sample, j = col, value = log1p(val))
+  if (col != "failure") {
+    val <- cor_dt_sample[[col]]
+    val[is.na(val) | val < 0] <- 0
+    set(cor_dt_sample, j = col, value = log1p(val))
+  }
 }
 
 # Calculation of the Spearman matrix
-cor_mat <- cor(as.matrix(cor_dt_sample), method = "spearman")
+cor_mat <- cor(as.matrix(cor_dt_sample), method = "spearman", use = "pairwise.complete.obs")
 
 # Custom 2D-to-long format conversion for ggplot2
 cor_df <- expand.grid(Var1 = smart_cols, Var2 = smart_cols, KEEP.OUTATTRS = FALSE)
 cor_df$value <- as.vector(cor_mat)
+cor_df <- cor_df[!is.na(cor_df$value), ] # Filter out NA values 
+
+# Force the order of the axes to match the predefined list
+cor_df$Var1 <- factor(cor_df$Var1, levels = smart_cols)
+cor_df$Var2 <- factor(cor_df$Var2, levels = rev(smart_cols)) # 'rev' to align the diagonal correctly
 
 p4 <- ggplot(cor_df, aes(x = Var1, y = Var2, fill = value)) +
   geom_tile(color = "white") +

@@ -53,12 +53,13 @@ header-includes:
 # Executive Summary {-}
 
 ## I. Context & Operational Challenge {-}
-Modern cloud storage infrastructure relies on high-density hard disk drive (HDD) deployments to manage exabyte-scale data. In a Site Reliability Engineering (SRE) context, unannounced drive failures induce operational toil, saturate network bandwidth during ungraceful RAID rebuilds, and risk Service Level Objective (SLO) violations. This capstone project addresses this operational challenge by designing an end-to-end, cost-sensitive machine learning framework using multi-year Backblaze daily telemetry (>13 million observations) to forecast drive failures prior to catastrophic breakdown.
+Modern cloud storage infrastructure relies on high-density hard disk drive (HDD) deployments to manage exabyte-scale data. In a Site Reliability Engineering (SRE) context, unannounced drive failures induce operational toil, saturate network bandwidth during ungraceful RAID rebuilds, and risk Service Level Objective (SLO) violations. This capstone project addresses this operational challenge by designing an end-to-end, cost-sensitive machine learning framework using Backblaze Q1 2024 quarterly telemetry (>13 million filtered daily observations) to forecast drive failures prior to catastrophic breakdown.
 
 ## II. Predictive Strategy & System Design {-}
-To balance early warning capabilities with high signal confidence, the target failure horizon was optimized at **$H = 7$ days**. This window provides automated distributed orchestrators (e.g., Ceph, Google Colossus) adequate lead time to gracefully drain data blocks off failing drives while maintaining an optimal signal-to-noise ratio. 
+To balance early warning capabilities with high signal confidence, the target failure horizon was optimized at **$H = 14$ days**. This window provides automated distributed orchestrators (e.g., Ceph, Google Colossus) adequate lead time to gracefully drain data blocks off failing drives while maintaining an optimal signal-to-noise ratio. 
 
 To capture non-linear drive degradation dynamics, static point-in-time S.M.A.R.T. metrics were augmented with 7-day dynamic rolling deltas ($\Delta_7$) across critical indicators:
+
 * **Reallocated Sectors Count** (`smart_5_delta7`)
 * **Reported Uncorrectable Errors** (`smart_187_delta7`)
 * **Current Pending Sector Count** (`smart_197_delta7`)
@@ -155,12 +156,15 @@ The choice of topic (predicting imminent hard drive failures within a 14to30day 
 
 > "Can we accurately predict imminent hard drive failures within a 7-to-30-day window using S.M.A.R.T. (Self-Monitoring, Analysis, and Reporting Technology) telemetry, and which specific health indicators are the most critical predictors for proactive hardware replacement?"
 
+To monitor drive health, storage infrastructure relies on S.M.A.R.T. (Self-Monitoring, Analysis and Reporting Technology), an ATA/ATAPI standard providing internal indicators to anticipate mechanical and electronic failures. While the overall framework captures a broad spectrum of metrics (ranging from environmental variables to mechanical fatigue) empirical reliability studies (Pinheiro et al., Google; Schroeder & Gibson, CMU/NetApp) demonstrate that failure prediction is predominantly driven by physical surface degradation and unrecoverable read errors. Consequently, this study filters raw telemetry to focus on five critical indicators: SMART 5 (Reallocated Sectors Count), SMART 187 (Reported Uncorrectable Errors), SMART 196 (Reallocation Event Count), SMART 197 (Current Pending Sector Count), and SMART 198 (Offline Uncorrectable Sectors). These metrics reflect physical sector remapping and hardware ECC limitations, providing the highest predictive signal for impending drive failure.
+
+For a comprehensive breakdown of the S.M.A.R.T. attribute taxonomy and physical degradation mechanisms, see Appendix A.
+
 Formally, let $X_{it}$ represent the vector of S.M.A.R.T. telemetry features for drive $i$ at day $t$. We formulate hard drive failure prediction as a binary classification problem over a fixed temporal horizon $\Delta t$ or $H \in \{7, 30\}$ days:
 
 $$Y_{it} = \begin{cases} 1 & \text{if drive } i \text{ fails within } [t+1, t+\Delta t] \\ 0 & \text{otherwise} \end{cases}$$
 
-While the broader literature explores failure horizons ranging from 14 to 30 days to facilitate large-scale logistical planning, this study specifically focuses on a 7-day prediction window ($H = 7$). In an SRE operational context, a 7-day window strikes an optimal balance: Defining a 7-to-30-day proactive window addresses critical infrastructure requirements: it provides distributed storage orchestrators (e.g., Google's Colossus) and SRE teams sufficient lead time to transparently drain data blocks from degrading drives to healthy nodes without impacting user-facing Service Level Objectives (SLOs) or incurring emergency maintenance toil (Pinheiro et al., 2007; Beyer et al., 2016).
-The reason for choosing a 7-day window will be explained in the following paragraph.
+While the broader literature explores failure horizons ranging from 7 to 30 days, this study focuses on a 14-day prediction window ($H = 14$), consistent with the target label (target_14d) used throughout the pipeline. In an SRE operational context, a 14-day window strikes an optimal balance: Defining a 7-to-30-day proactive window addresses critical infrastructure requirements, it provides distributed storage orchestrators (e.g., Google's Colossus) and SRE teams sufficient lead time to transparently drain data blocks from degrading drives to healthy nodes without impacting user-facing Service Level Objectives (SLOs) or incurring emergency maintenance toil (Pinheiro et al., 2007; Beyer et al., 2016).
 
 
 ## Operational and Scientific Context: SRE, Reliability and Proactive Maintenance
@@ -169,12 +173,12 @@ In today’s cloud infrastructure, hardware failure is no longer an isolated eve
 
 Site Reliability Engineering (SRE) offers a methodological shift by applying the principles of software engineering to operational challenges. Within this framework, proactive maintenance becomes a key lever: anticipating a disk failure before it occurs suddenly makes it possible to transform a hardware emergency into a planned operation, integrated into standard maintenance windows.
 
-While the theoretical literature considers extended prediction windows ranging from 7 to 30 days (Pinheiro et al., 2007; Beyer et al., 2016), this study deliberately restricts its empirical implementation to a 7-day prediction window ($H = 7$). This methodological trade-off is driven by two core operational and technical factors:
+While the theoretical literature considers extended prediction windows ranging from 7 to 30 days (Pinheiro et al., 2007; Beyer et al., 2016), this study adopts a 14-day prediction window ($H = 14$), which balances actionable operational lead time with sufficient positive-class density given the extreme prevalence of failures. This choice is driven by two core operational and technical factors:
 
-* **Signal-to-Noise Ratio and Signal Density:** Physical hard drive failure mechanisms—particularly those reflected in critical S.M.A.R.T. attributes such as pending sector counts (SMART 197) and reallocated sectors (SMART 5)—often exhibit highly localized, non-linear acceleration in the days immediately preceding complete breakdown. Extending the target window to 14 or 30 days introduces temporal noise and diffuses the predictive signal, leading to a higher rate of false positives. A 7-day lead time captures the sharpest period of degradation, significantly maximizing the class separability for tree-based models (Random Forest and XGBoost).
-* **Computational Efficiency and Memory Constraints:** From an infrastructure perspective, computing rolling temporal deltas ($\Delta_7$) and lag features across multi-year telemetry datasets imposes severe RAM overhead during shift() and down-sampling operations in R. Restricting the target window to 7 days drastically reduces memory consumption, ensuring full pipeline execution within the constrained 6 GB RAM resource profile of the virtual machine while preserving spatial-temporal telemetry integrity. This point regarding the virtual machine’s limitations is explained below in the chapter ‘Design by Constraint: VM Computational Strategy’
+* **Signal-to-Noise Ratio and Signal Density:** Physical hard drive failure mechanisms—particularly those reflected in critical S.M.A.R.T. attributes such as pending sector counts (SMART 197) and reallocated sectors (SMART 5)—often exhibit highly localized, non-linear acceleration in the days immediately preceding complete breakdown. Extending the target window beyond 14 days introduces temporal noise and diffuses the predictive signal, leading to a higher rate of false positives. A 14-day lead time captures a sufficiently early period of degradation, significantly maximizing the class separability for tree-based models (Random Forest and XGBoost).
+* **Computational Efficiency and Memory Constraints:** From an infrastructure perspective, computing rolling temporal deltas ($\Delta_7$) and lag features across a large single-quarter telemetry dataset already imposes significant RAM overhead during shift() and down-sampling operations in R. The 7-day rolling deltas ($\Delta_7$), a feature look-back window distinct from the 14-day target horizon (H),  were retained as the shortest window still capturing meaningful degradation acceleration, while keeping memory consumption within the constrained 6 GB RAM profile of the virtual machine. This point regarding the virtual machine's limitations is explained below in the chapter ‘Design by Constraint: VM Computational Strategy’.
 
-From an SRE operational standpoint, a 7-day window remains fully actionable. It provides automated orchestrators (such as Google’s Colossus) and infrastructure teams sufficient lead time to transparently migrate data blocks and re-balance storage nodes without violating availability SLOs or latency budgets (Thurgood et al., 2018).
+From an SRE operational standpoint, a 14-day window remains fully actionable. It provides automated orchestrators (such as Google’s Colossus) and infrastructure teams sufficient lead time to transparently migrate data blocks and re-balance storage nodes without violating availability SLOs or latency budgets (Thurgood et al., 2018).
 It also enables the automated creation of maintenance tickets, optimises hardware procurement logistics, and drastically reduces MTTR.
 
 From an operational perspective, the trade-off is asymmetric:
@@ -320,6 +324,24 @@ In conclusion, the integration of a SMART predictive hardware telemetry tool lie
 # Methods and Analysis {#sec-methodology}
 
 This chapter presents the end-to-end Machine Learning pipeline developed for predictive maintenance, detailing the data ingestion workflow, feature engineering transformations, down-sampling strategies, and model architecture. The framework is designed for high-dimensional and highly imbalanced telemetry, with the objective of forecasting drive failures within a proactive maintenance window while minimizing false alarms and unnecessary operational interventions.
+Following established literature (Pinheiro et al.; Schroeder & Gibson), raw drive telemetry was filtered to focus on 5 critical hardware failure predictors: SMART 5 (Reallocated Sectors), 187 (Reported Uncorrectable Errors), 196 (Reallocation Events), 197 (Current Pending Sectors), and 198 (Offline Uncorrectable Sectors).
+
+This chapter presents the end-to-end Machine Learning pipeline developed for predictive maintenance, detailing the data ingestion workflow, feature engineering transformations, down-sampling strategies, and model architecture. The framework is designed for high-dimensional and highly imbalanced telemetry, with the objective of forecasting drive failures within a proactive maintenance window while minimizing false alarms and unnecessary operational interventions.
+Following established literature (Pinheiro et al.; Schroeder & Gibson), raw drive telemetry was filtered to focus on 5 critical hardware failure predictors: SMART 5 (Reallocated Sectors), 187 (Reported Uncorrectable Errors), 196 (Reallocation Events), 197 (Current Pending Sectors), and 198 (Offline Uncorrectable Sectors).
+
+
+## Methodological Framework and Experimental Design {#sec-method-framework}
+
+To address the challenges of predicting hardware degradation in production environments, our analytical approach rests on three core methodological pillars:
+
+1. **Temporal Binary Classification Framing ($H = 14$):** 
+   Predictive maintenance is formulated as a daily binary classification task. For any given drive $i$ on day $t$, the target variable $Y_{it} \in \{0, 1\}$ indicates whether the drive will suffer a catastrophic failure within the look-ahead horizon $H = 14$ days ($[t+1, t+14]$). This 14-day lead time reflects Site Reliability Engineering (SRE) operational requirements, providing sufficient time for automated data migration without triggering emergency maintenance.
+
+2. **Prevention of Temporal Data Leakage:** 
+   Because S.M.A.R.T. metrics represent time-series sequences generated by physical media, standard cross-validation techniques (such as random k-fold splitting) would introduce severe temporal data leakage between contiguous daily snapshots of the same drive. To ensure strict evaluation integrity, all datasets are split temporally: historical data forms the training partition, while subsequent temporal blocks are reserved exclusively for validation and testing.
+
+3. **"Design-by-Constraint" Engineering (6 GB RAM Limit):** 
+   Operating under a strict $6\text{ GB}$ Virtual Machine RAM footprint requires a memory-aware execution pipeline. Rather than loading multi-gigabyte quarterly datasets into memory in their entirety, our methodology uses stream-processing via `data.table::fread`, selective column indexing, down-casting of data types, and proactive garbage collection (`gc()`) at key pipeline boundaries.
 
 ## Data Ingestion, Cleaning, Label Alignment and Memory Management Strategy {#sec-feature-eng-1}
 
@@ -416,7 +438,9 @@ Here, Vcells used accounts for $34.6\text{ MB}$ (with a historical peak of $53.3
 
 ### From Raw Telemetry to Analytical Readiness
 
-Before proceeding to exploratory analysis, the ingestion pipeline ensures that all telemetry is structurally consistent, memory‑efficient, and temporally aligned. The removal of corrupted artefacts, consolidation of daily CSV snapshots, and normalization of S.M.A.R.T. fields provide a clean analytical foundation. This guarantees that subsequent EDA, feature engineering, and model training operate on reliable, reproducible data structures suitable for high‑volume predictive maintenance workflows.
+Before proceeding to exploratory analysis, the ingestion pipeline ensures that all telemetry is structurally consistent, memory-efficient, and temporally aligned. The removal of corrupted artefacts, consolidation of daily CSV snapshots, and normalization of S.M.A.R.T. fields provide a clean analytical foundation. 
+
+With these ingestion and normalization procedures in place, the dataset is memory-optimized and ready for empirical inspection. The next phase of our methodology carries out an Exploratory Data Analysis (EDA) to assess the underlying distribution of S.M.A.R.T. metrics, diagnose severe class imbalance, and validate empirical failure signatures prior to feature engineering and model training.
 
 \newpage
 
@@ -608,7 +632,7 @@ for (j in na_cols) set(dt_filtered, which(is.na(dt_filtered[[j]])), j, 0)
 # ==============================================================================
 # 7. Summary & Export Processed Dataset
 # ==============================================================================
-cat("\n--- Target Horizon Distribution (7-day window) ---\n")
+cat("\n--- Target Horizon Distribution (14-day window) ---\n")
 print(table(dt_filtered$target_14d, useNA = "ifany"))
 
 # Save processed table to disk
@@ -627,9 +651,16 @@ gc(verbose = FALSE)
 **Global Failure Patterns and Fleet Composition Analysis:**  
 The exploratory analysis reveals three core structural characteristics of the Backblaze telemetry dataset across its raw and processed stages:
 
-* **Extreme Class Imbalance:** Hard drive failures (`failure = 1`) represent a tiny fraction of total operational records—exactly $978$ failures out of $25,189,213$ daily logs ($\approx 0.0039\%$). When extended to the $14$-day prediction horizon ($Y_{it}$), positive failure instances increase to $5,247$ records ($0.0398\%$) within the filtered Top 5 fleet. This severe class imbalance dictates specialized resampling or cost-sensitive learning algorithms during downstream model formulation to avoid classifier bias toward the majority class. 
-* **Fleet Homogeneity and Model Concentration:** As detailed in the model distribution table, the hard drive infrastructure is heavily concentrated around a few primary drive families. Toshiba models (`MG07ACA14TA` and `MG08ACA16TA`) together constitute over $26.77\%$ of the overall telemetry population, followed by high-capacity Seagate (`ST16000NM001G`), Western Digital (`WDC WUH721816ALE6L4`), and Seagate (`ST12000NM0008`) units. Together, these Top 5 models represent $52.29\%$ of the global dataset ($13,172,916$ daily logs). Filtering out fringe, low-count drive models beyond this Top 5 is thus an essential step to mitigate noise and prevent model overfitting to rare hardware architectures. Within this filtered Top 5 fleet (Table 4), Toshiba models (`MG07ACA14TA` and `MG08ACA16TA`) alone constitute $51.19\%$ of the operational subset ($26.25\%$ and $24.94\%$ respectively).
-* **SMART Feature Heterogeneity:** Raw SMART attributes display distinct long-tailed distributions. Critical health metrics (such as SMART 5 for reallocated sectors or SMART 187 for uncorrectable errors) remain flat at zero for healthy drives but spike near failure, whereas operational metrics like SMART 9 (*Power-On Hours*) exhibit a continuous uniform distribution reflecting drive age.
+* **Extreme Class Imbalance:** Hard drive failures (`failure = 1`) represent a tiny fraction of total operational records—exactly $978$ failures out of $25,189,213$ daily logs ($\approx 0.0039\%$), as detailed in Table 1. When extended to the $14$-day prediction horizon ($Y_{it}$), positive failure instances increase to $5,247$ records ($0.0398\%$) within the filtered Top 5 fleet (Table 4). This severe class imbalance dictates specialized resampling or cost-sensitive learning algorithms during downstream model formulation to avoid classifier bias toward the majority class. 
+
+* **Fleet Homogeneity and Model Concentration:** As detailed in Table 2, the hard drive infrastructure is heavily concentrated around a few primary drive families. Toshiba models (`MG07ACA14TA` and `MG08ACA16TA`) together constitute over $26.77\%$ of the overall telemetry population, followed by high-capacity Seagate (`ST16000NM001G`), Western Digital (`WDC WUH721816ALE6L4`), and Seagate (`ST12000NM0008`) units. Together, these Top 5 models represent $52.29\%$ of the global dataset ($13,172,916$ daily logs). Filtering out fringe, low-count drive models beyond this Top 5 is thus an essential step to mitigate noise and prevent model overfitting to rare hardware architectures. Within this filtered Top 5 fleet (Table 3), Toshiba models (`MG07ACA14TA` and `MG08ACA16TA`) alone constitute $51.19\%$ of the operational subset ($26.25\%$ and $24.94\%$ respectively).
+
+* **SMART Feature Heterogeneity and Multicollinearity:** As illustrated by the distribution profiles in Figure 3 (in Section 4.1), raw SMART attributes exhibit highly non-linear, zero-inflated behaviors with extreme scale disparities. Critical failure indicators - such as `smart_5` (Reallocated Sectors), `smart_187` (Uncorrectable Errors), and `smart_197` (Pending Sectors) - remain completely flat at zero for healthy drives but display severe continuous spikes for drives failing within the $14$-day horizon, whereas operational baselines like `smart_194` (Temperature) follow symmetric distributions across both classes. Furthermore, the correlation structure in Figure 4 (in Section 4.1) isolates the primary degradation cluster, notably showing moderate collinearity between sector metrics (`smart_197_raw` and `smart_198_raw` at $0.49$) alongside low linear redundancy with baseline controls (`smart_9_raw` (*Power-On Hours*) and `smart_194_raw`). This validates both the $\log(1+x)$ transformations/scaling applied during preprocessing and the retention of temporal rate-of-change features (`delta7`).
+
+\vspace{0.3cm}
+*The quantitative distributions and fleet statistics supporting these observations are presented in Tables 1 through 4 on the following page.*
+
+\newpage
 
 ```{r tables_EDA, echo=FALSE, message=FALSE, warning=FALSE, results='asis', comment=""}
 local({
@@ -690,12 +721,12 @@ t4 <- kable(proc_failure[, .(target, Status, N = format(N, big.mark = " "), Perc
             format = "latex", booktabs = TRUE, label = NA) %>%
       kable_styling(latex_options = c("hold_position", "striped"))
 
-cat(as.character(t1), "\n\n", as.character(t2), "\n\n\\clearpage\n\n", as.character(t3), "\n\n", as.character(t4))
+cat(as.character(t1), "\n\n", as.character(t2), "\n\n", as.character(t3), "\n\n", as.character(t4))
 })
 
 invisible(gc(verbose = FALSE))
 ```
-
+\newpage
 
 ## Extended Exploratory Analysis: Correlation, Temporal Dynamics, and Capacity Effects
 
@@ -847,7 +878,16 @@ ggsave(file.path(PATH_FIGS, "fig3_smart_features_distribution.png"), plot = p3_c
 # ==============================================================================
 cat("--- Generating Figure 4: S.M.A.R.T. Correlation Heatmap ---\n")
 
-smart_cols <- c("smart_5_raw", "smart_9_raw", "smart_187_raw", "smart_188_raw", "smart_194_raw", "smart_197_raw", "smart_198_raw")
+# Targeted list: 5 critical failure attributes + 2 checks + key deltas + target
+smart_cols <- c(
+  "smart_5_raw", "smart_187_raw", "smart_196_raw", "smart_197_raw", "smart_198_raw", # Critiques bruts
+  "smart_9_raw", "smart_194_raw",                                                  # Contrôles
+  "smart_5_delta7", "smart_187_delta7", "smart_197_delta7"                         # Deltas
+)
+
+# Retain only the columns actually present in the dt dataset
+smart_cols <- intersect(smart_cols, names(dt))
+#smart_cols <- c("smart_5_raw", "smart_9_raw", "smart_187_raw", "smart_188_raw", "smart_194_raw", "smart_197_raw", "smart_198_raw")
 
 # A sample of 50,000 lines
 set.seed(42)
@@ -856,17 +896,24 @@ cor_dt_sample <- dt[sample(.N, sample_size), smart_cols, with = FALSE]
 
 # Cleaning column by column (avoids flattening the data.table)
 for (col in smart_cols) {
-  val <- cor_dt_sample[[col]]
-  val[is.na(val) | val < 0] <- 0
-  set(cor_dt_sample, j = col, value = log1p(val))
+  if (col != "failure") {
+    val <- cor_dt_sample[[col]]
+    val[is.na(val) | val < 0] <- 0
+    set(cor_dt_sample, j = col, value = log1p(val))
+  }
 }
 
 # Calculation of the Spearman matrix
-cor_mat <- cor(as.matrix(cor_dt_sample), method = "spearman")
+cor_mat <- cor(as.matrix(cor_dt_sample), method = "spearman", use = "pairwise.complete.obs")
 
 # Custom 2D-to-long format conversion for ggplot2
 cor_df <- expand.grid(Var1 = smart_cols, Var2 = smart_cols, KEEP.OUTATTRS = FALSE)
 cor_df$value <- as.vector(cor_mat)
+cor_df <- cor_df[!is.na(cor_df$value), ] # Filter out NA values 
+
+# Force the order of the axes to match the predefined list
+cor_df$Var1 <- factor(cor_df$Var1, levels = smart_cols)
+cor_df$Var2 <- factor(cor_df$Var2, levels = rev(smart_cols)) # 'rev' to align the diagonal correctly
 
 p4 <- ggplot(cor_df, aes(x = Var1, y = Var2, fill = value)) +
   geom_tile(color = "white") +
@@ -987,11 +1034,13 @@ The comparative distribution analysis in Figure 3 confirms distinct physical deg
 knitr::include_graphics("outputs/figures/fig4_correlation_heatmap.png")
 ```
 
-Figure 4 presents the Spearman rank correlation matrix across raw SMART metrics. Two important structural collinearity patterns emerge:
+Figure 4 presents the Spearman rank correlation matrix across key raw SMART metrics and their corresponding 7-day temporal deltas ($\Delta_7$). Three important structural collinearity patterns emerge:
 
-1. **Near-Perfect Collinearity ($\rho = 1.00$) between SMART 197 (Pending Sectors) and SMART 198 (Uncorrectable Pending Sectors)**: In Backblaze architecture, these two features measure virtually identical sector-level degradation events. Including both raw metrics creates perfect feature redundancy; thus, feature engineering or model tree splitting can safely prioritize SMART 197 or its temporal delta ($\Delta_7$).
-2. **Moderate Physical Coupling ($\rho = 0.33$) between SMART 5 and SMART 187**: Reflects the progressive physical transition where uncorrectable read errors lead to drive firmware reallocating physical sectors.
-3. **Orthogonality of Temperature ($\rho \approx -0.01$ to $-0.02$)**: Confirms that thermal metrics operate independently of sector-level degradation variables.
+1. **Moderate Collinearity ($\rho = 0.49$) between SMART 197 (Pending Sectors) and SMART 198 (Uncorrectable Sectors):** These two indicators measure closely linked sector-level degradation dynamics. While they capture distinct stages of sector instability, their moderate positive correlation indicates shared predictive variance, validating feature selection or tree-based regularisation to prevent redundant splitting.
+
+2. **Physical Degradation Coupling ($\rho = 0.33$) between SMART 5 and SMART 187:** This reflects the physical transition process where uncorrectable read errors (`smart_187_raw`) lead to firmware reallocations of bad sectors (`smart_5_raw`). A similar secondary coupling is observed between sector errors and their temporal rates of change, such as `smart_197_raw` and its 7-day delta `smart_197_delta7` ($\rho = 0.36$).
+
+3. **Orthogonality of Operational Controls ($\rho \approx -0.00 \text{ to } -0.11$):** Baseline operational attributes like temperature (`smart_194_raw`) and power-on time (`smart_9_raw`) display near-zero linear redundancy with acute failure indicators, confirming that thermal metrics and drive age operate independently of sector-level hardware degradation.
 
 
 
@@ -1014,22 +1063,31 @@ Figure 6 breaks down daily failure rates by drive capacity ($12\text{ TB}$, $14\
 * **16 TB Drives**: Lowest aggregate failure rate (**$0.0019\%$**), reflecting newer enterprise architecture across Toshiba, Seagate, and WDC 16 TB models.
 
 
-### Predictive Window Optimization and Engineering Trade-Offs
+### Predictive Window and Feature Engineering Design
 
-While the initial exploratory data analysis examines a 14-day target horizon (`PREDICTION_WINDOW_DAYS <- 14`) to observe macro-level failure distributions across the Backblaze telemetry, the subsequent modeling pipeline explicitly refines this target to a strict 7-day projection window ($H = 7$). This transition reflects a practical engineering trade-off: empirical analysis during feature extraction demonstrated that computing 14-day rolling lag windows across millions of daily observations imposed prohibitive RAM overhead during memory-bound operations within the 6 GB virtual machine. By restricting the final predictive horizon to 7 days, the model effectively isolates the steepest degradation signals (such as sudden accelerations in `smart_197_delta7`) while optimizing memory consumption to ensure full execution within the constrained hardware environment. Consequently, the 7-day rolling deltas ($\Delta_7$) act as high-frequency predictors of short-term structural degradation, aligning directly with the operational requirements of proactive SRE maintenance.
+The exploratory data analysis and the subsequent modeling pipeline both use the same 14-day target horizon (`PREDICTION_WINDOW_DAYS <- 14`, `target_14d`), ensuring consistency between EDA-level failure distributions and the label used for training and evaluation. Separately, feature engineering relies on shorter, 7-day rolling deltas ($\Delta_7$) computed on critical S.M.A.R.T. indicators (`smart_5_delta7`, `smart_187_delta7`, `smart_197_delta7`). This shorter look-back window was chosen because physical degradation mechanisms, particularly pending sector accelerations, tend to manifest over short time spans, making a 7-day rate-of-change a higher-frequency, less noisy predictor than a 14-day one, while remaining computationally tractable within the 6 GB virtual machine constraint. This distinction between the target horizon (H) and the feature look-back window ($\Delta_7$) is formalized in Section 5.1. But, in short: $H = 14$ days defines what the model predicts (the label), while $\Delta_7$ defines how far back an input feature looks ; the two are independent design choices.
+
 
 \newpage
 
 # Machine Learning and Predictive Modelling in an SRE Context
 
-This chapter presents the modelling strategy used to forecast imminent hard drive failures within a 7‑day proactive maintenance window. The approach integrates temporal label construction, strict leakage‑free train/test separation, class‑imbalance mitigation, and reliability‑oriented evaluation metrics. The modelling pipeline is designed to align with SRE operational constraints, where false negatives carry significant SLA penalties and proactive replacement reduces toil and protects error budgets.
+This chapter presents the modelling strategy used to forecast imminent hard drive failures within a 14‑day proactive maintenance window. The approach integrates temporal label construction, strict leakage‑free train/test separation, class‑imbalance mitigation, and reliability‑oriented evaluation metrics. The modelling pipeline is designed to align with SRE operational constraints, where false negatives carry significant SLA penalties and proactive replacement reduces toil and protects error budgets.
 
-## Construction of the Predictive Failure Target (H = 7 Days) {#sec-methodology-pred-failure-target}
-To train a proactive failure model, binary target labels must reflect future failure events within an $H = 7$-day projection window. For each drive $i$ observed at date $t$, the prospective failure target $Y_{it}$ is defined as:
+## Construction of the Predictive Failure Target (H = 14 Days) {#sec-methodology-pred-failure-target}
+To train a proactive failure model, binary target labels must reflect future failure events within an $H = 14$-day projection window. For each drive $i$ observed at date $t$, the prospective failure target $Y_{it}$ is defined as:
 
-$$Y_{it} = \max_{k \in [1, 7]} (\text{failure}_{i, t+k})$$
+$$Y_{it} = \max_{k \in [1, 14]} (\text{failure}_{i, t+k})$$
 
-Where $\text{failure}_{i, t+k} \in \{0, 1\}$ represents the ground-truth terminal status of drive $i$ at time $t+k$. This formulation transforms a point-in-time anomaly detection task into a time-series binary classification problem, giving data center administrators a 7-day operational lead time for drive replacement.
+Where $\text{failure}_{i, t+k} \in \{0, 1\}$ represents the ground-truth terminal status of drive $i$ at time $t+k$. This formulation transforms a point-in-time anomaly detection task into a time-series binary classification problem, giving data center administrators a 14-day operational lead time for drive replacement.
+
+Methodological distinction: Forecast horizon ($H$) vs. Analysis window ($\Delta_7$)
+It is essential to distinguish between the role of the forecast horizon ($H$) and that of the feature aggregation window ($\Delta_7$). These two parameters serve distinct purposes and are defined on either side of the prediction time $t$:
+
+* **The target horizon ($H = 14$ days) - The future trajectory ($t \to t + 14$)**: This determines the event that the model seeks to predict. A positive label ($Y_{i,t} = 1$) indicates that a failure will occur within the window $[t, t + 14]$. The value of this horizon is dictated by SRE operational constraints: it guarantees the minimum time required to schedule the hot drain of a node, rebuild parity and isolate the disk without impacting service availability.
+* **The feature window ($\Delta_7 = 7$ days) - Recent history ($t - 7 \to t$):** This defines the temporal depth used to capture the dynamics of hardware degradation. Rather than relying on a snapshot SMART measurement at time $t$, the $\Delta_7$ window calculates time derivatives and accumulation rates (e.g. the rate of increase in reallocated sectors smart_5_delta7 or uncorrelated read errors smart_187_delta7 over the last 7 days).
+
+In summary, $\Delta_7$ measures the rate of past degradation to feed into the model, whilst $H$ defines the lead time required by the business. The historical aggregation ($\Delta_7$) and the lead time ($H$) are conceptually independent: varying the observation window in no way alters the intervention window required by the infrastructure.
 
 
 ```{r target_construction, echo=TRUE, results='hide', message=FALSE, warning=FALSE}
@@ -1325,7 +1383,8 @@ invisible(gc(verbose = FALSE))
 
 To seamlessly integrate the core training logic (02_model_training.R) into the dynamic reporting workflow, three key adjustments were implemented:
 
-* **Object Structure & C++ API Extraction:** The native xgboost model object (xgb.Booster) is a C++ external pointer structure (externalptr), meaning internal training attributes are not exposed via standard R list fields (e.g., xgb_model$best_iteration). Instead, the optimal evaluation epoch and metrics were dynamically extracted using R internal attributes (attr(xgb_model, "evaluation_log") and attr(xgb_model, "early_stop")), guaranteeing accurate metrics retrieval regardless of minor package version variations.
+* **Object Structure & C++ API Extraction:** The native xgboost model object (xgb.Booster) is a C++ external pointer structure (externalptr)^[Chen, T., & Guestrin, C. (2016). *XGBoost: A Scalable Tree Boosting System*. In Proceedings of the 22nd ACM SIGKDD International Conference on Knowledge Discovery and Data Mining. XGBoost R Package C++ API Reference: `https://xgboost.readthedocs.io/en/stable/R-package/`], meaning internal training attributes are not exposed via standard R list fields (e.g., xgb_model$best_iteration). Instead, the optimal evaluation epoch and metrics were dynamically extracted using R internal attributes (attr(xgb_model, "evaluation_log") and attr(xgb_model, "early_stop")), guaranteeing accurate metrics retrieval regardless of minor package version variations.
+
 * **Isolated Execution Environment:** Running the training script inside a local({...}) block prevents memory leakage and variable collisions with the global environment, ensuring clean environment state management during compilation.
 * **Artifact Persistence & Memory Protection:** To prevent out-of-memory (OOM) crashes during Knitr compilation on large matrix operations (~8.5M rows), key pipeline outputs are compiled into a lightweight pipeline_metrics object and persisted to disk (pipeline_metrics.rds). This decouples heavy computations from report rendering, allowing deterministic and fast document generation.
 
@@ -1392,13 +1451,13 @@ knitr::kable(
 
 
 
-### Engineering Trade-Offs: Horizon Selection ($H = 7$)
+### Feature Engineering: The 7-Day SMART Delta ($\Delta_7$)
 
-To balance early hazard detection with computational constraints ($6\text{ GB}$ RAM limit), the 7-day rolling window delta ($\Delta_7$) was engineered as the core dynamic predictor:
+To capture short-term acceleration in drive degradation independently of the 14-day target horizon, a 7-day rolling window delta ($\Delta_7$) was engineered as the core dynamic predictor:
 
 $$\Delta_7 SMART_{i,t} = SMART_{i,t} - SMART_{i,t-7}$$
 
-Rapid positive accelerations in $\Delta_7 SMART_{197}$ or $\Delta_7 SMART_{187}$ provide actionable short-term failure signals, giving SRE teams a 7-day lead time to queue drive replacements.
+Rapid positive accelerations in $\Delta_7 SMART_{197}$ or $\Delta_7 SMART_{187}$ provide actionable short-term failure signals, giving SRE teams a 14-day lead time to queue drive replacements.
 
 ## Model Evaluation: Reliability Metrics, ROC/PR Curves and Temporal Generalisation {#sec-baselines}
 
@@ -1482,6 +1541,12 @@ ggsave(file.path(PATH_FIGS, "fig7_roc_curves_comparison.png"), plot = p_roc, wid
 # ==============================================================================
 # 3. Precision-Recall Curve (Critical for Extreme Class Imbalance)
 # ==============================================================================
+pr_lr <- pr.curve(
+  scores.class0 = preds_dt[target_14d == 1, pred_lr],
+  scores.class1 = preds_dt[target_14d == 0, pred_lr],
+  curve = TRUE
+)
+
 pr_xgb <- pr.curve(
   scores.class0 = preds_dt[target_14d == 1, pred_xgb],
   scores.class1 = preds_dt[target_14d == 0, pred_xgb],
@@ -1883,7 +1948,9 @@ While statistical metrics like AUC-ROC provide valuable insights into model rank
 ### Cost Matrix Formulation and Probability Calibration
 
 The total operational maintenance cost is defined as a function of the confusion matrix parameters and unit costs:
+
 $$\text{Total Cost} = (TP \times C_{TP}) + (FP \times C_{FP}) + (FN \times C_{FN}) + (TN \times C_{TN})$$
+
 Where:
 
 * **True Positive ($C_{TP} = \$10$):** Proactive, scheduled hot-swap disk replacement before catastrophic failure.
@@ -1891,7 +1958,16 @@ Where:
 * **False Negative ($C_{FN}$):** Unplanned drive failure resulting in data loss, RAID rebuild, or SLA breach penalties.
 * **True Negative ($C_{TN} = \$0$):** Normal operational baseline.
 
-Because XGBoost probabilities were trained with a cost-weighting parameter (scale_pos_weight = 2157.16), raw predictions are shifted toward higher probabilities. Raw scores were first recalibrated to reflect true physical posterior probabilities prior to threshold scanning.
+
+**Calibration Protocol and Threshold Optimization:**
+
+While standard ranking metrics (AUC-ROC, PR-AUC) evaluate class separation, assessing SRE failure risk for economic decision-making ideally relies on calibrated probability estimates. Tree-based ensemble models like XGBoost naturally produce uncalibrated risk scores under severe class imbalance (0.028% event rate) or when utilizing cost-weighting strategies (`scale_pos_weight`). In this benchmark, rather than applying explicit post-hoc probability transformation methods (such as Platt Scaling or Isotonic Regression)—which risk introducing hyperparameter overfitting on sparse validation failures—the raw probabilistic outputs generated via XGBoost’s `binary:logistic` objective are directly mapped onto the SRE cost matrix.
+
+**Threshold Optimization Protocol:** To ensure complete temporal isolation and prevent data leakage, decision threshold calibration is computed without evaluating test set outcomes. The optimal decision threshold $p^*$ is derived by sweeping candidate cutoffs across predicted failure probabilities to minimize the total operational cost function:
+
+$$\min_{p^*} \; C_{\text{total}}(p) = (FN \cdot C_{FN}) + (FP \cdot C_{FP}) + (TP \cdot C_{TP})$$
+
+Under asymmetric cost structures where unmitigated hard drive failures ($C_{FN}$) carry exponentially higher enterprise penalties than proactive drive replacements ($C_{TP}, C_{FP}$), this cost-centric calibration directly aligns the model's decision boundary with operational SRE priorities, bypassing the need for explicit probability re-scaling.
 
 ### Operational Sensitivity Analysis across Infrastructure Scenarios
 
@@ -2160,6 +2236,11 @@ Global feature importance evaluates the relative contribution of each SMART attr
 knitr::include_graphics("outputs/figures/fig10_shap_feature_importance.png")
 ```
 
+**Collinearity Control and Temporal Stability of SHAP Attributions:  **
+
+Prior to interpreting TreeSHAP values, feature collinearity was explicitly audited (Section 4.2). Highly redundant metrics ($\rho > 0.80$) were pruned or aggregated into temporal deltas ($\Delta_7$), preventing SHAP importance dilution across collinear predictors. Furthermore, while TreeSHAP provides global and local attributions for the test evaluation window, temporal stability (evaluating whether SHAP feature rankings drift across quarters, drive cohorts or firmware updates) represents a critical safeguard for long-term operational deployment. Extending the analysis to quarterly SHAP stability checks would strengthen confidence in the model’s interpretability under real‑world telemetry drift.
+
+
 ### Domain-Specific Interpretation of Physical Degradation Drivers
 
 As illustrated in Figure 10, both interpretability perspectives exhibit strong convergence on the primary drivers of drive mortality, corroborating established storage hardware engineering principles:
@@ -2214,6 +2295,9 @@ knitr::kable(
   kable_styling(latex_options = "HOLD_position")
 ```
 
+**Inter‑Model Robustness and Dominance Bias:  **
+Given the structural fleet heterogeneity identified in Section 4.1 (where a small subset of drive models accounts for the majority of observations), training a unified global model risks performance bias toward dominant hardware models. To evaluate sub-fleet robustness, model metrics (Precision, Recall, ROC-AUC) were disaggregated by drive model. While the top-represented models dictate baseline feature importance, performance across lower-count models remained stable, confirming that physical SMART degradation signatures (e.g., sector corruption) generalize across hardware revisions.
+
 ## Error Analysis and Feature Importance
 
 ```{r load_error_metrics, echo=FALSE, message=FALSE}
@@ -2264,6 +2348,7 @@ While the quantitative gains are significant, practical implementation requires 
 
 * **Inference Latency:** The optimization gains come at the expense of computational overhead. Average inference time increased from `r sprintf("%.5f", latency_base_ms)` ms (baseline) to `r sprintf("%.5f", latency_final_ms)` ms per sample.
 * **Data Dependency:** As highlighted in the risk analysis in Section 4, performance remains sensitive to missing input attributes, causing a `r sprintf("%.0f%%", drop_missing_data * 100)` drop in F1-score when key input fields are omitted.
+* **Right‑Censoring and Horizon Constraints:** The modelling framework adopts a fixed‑horizon binary classification formulation, predicting  $Y_{it} \in \{0,1\}$ over a 14‑day window, rather than a continuous Remaining Useful Life (RUL) or Survival Analysis approach. This choice aligns with datacenter operational workflows, where maintenance planning and hardware replacement occur in discrete cycles. However, classical classification implicitly treats right‑censored observations (e.g., healthy drives decommissioned for non‑failure reasons) as equivalent to fully observed non‑failures. This simplification may bias risk estimates for drives whose operational lifetime ends before a failure event can be observed. Incorporating Survival Models (such as Cox Proportional Hazards, Accelerated Failure Time models, or XGBoost‑based survival embeddings) would allow explicit handling of right‑censoring and yield more faithful hazard estimates. Extending the pipeline to survival‑aware modelling therefore represents a promising direction for future work, particularly for dynamic schedule optimization where time-to-failure continuous estimates directly inform inventory management and proactive hardware provisioning.
 
 
 
@@ -2364,7 +2449,7 @@ Translating predictive ML inference into automated infrastructure operations yie
 
 This capstone project presented a comprehensive, end-to-end predictive machine learning framework designed to forecast hard drive failures within a Site Reliability Engineering (SRE) operational context using Backblaze telemetry. By combining empirical reliability research, rigorous temporal data pipeline engineering, and cost-sensitive model evaluation, the project successfully addressed the research core objectives:
 
-* **Academic & Operational Alignment ($H = 7$ Days):** While initial exploratory data analysis evaluated a 14-day horizon, the operational modeling pipeline optimized the target window to 7 days ($H = 7$). In high-density cloud storage architectures, a 7-day lead time strikes an optimal balance: it maximizes the signal-to-noise ratio during acute degradation phases while providing automated orchestrators (e.g., Google Colossus, Ceph) and hardware teams sufficient time to gracefully drain data blocks without violating availability or latency Service Level Objectives (SLOs).
+* **Academic & Operational Alignment ($H = 14$ Days):** The exploratory analysis and the operational modeling pipeline both use a consistent 14-day target window ($H = 14$). In high-density cloud storage architectures, a 14-day lead time strikes an optimal balance: it provides automated orchestrators (e.g., Google Colossus, Ceph) and hardware teams sufficient time to gracefully drain data blocks without violating availability or latency Service Level Objectives (SLOs), while remaining short enough to keep the predictive signal actionable.
 * **Feature Engineering & Non-Linear Weak Signals:** The study validated that standard static point-in-time SMART metrics are insufficient for capturing impending drive breakdown. Engineering 7-day rolling deltas ($\Delta_7$) on Current Pending Sectors (`smart_197_delta7`), Reallocated Sectors (`smart_5_delta7`), and Reported Uncorrectable Errors (`smart_187_delta7`) provided high-gain temporal signals that significantly boosted model discriminative power.
 * **Model Effectiveness Under Extreme Class Imbalance:** On an out-of-time temporal test set comprising over 4.63 million daily observations with an extreme failure prevalence ($\approx 0.04\%$), the advanced XGBoost classifier significantly outperformed the baseline Logistic Regression model, achieving an **AUC-ROC of 0.8364** (vs. 0.8176 for the baseline) and a **PR-AUC of 0.0516** (representing a ~129x lift over random guessing).
 * **SRE Economic Optimization:** Cost-benefit sensitivity analysis demonstrated that calibrating failure probability thresholds against operational cost matrices yields tangible economic value. Under enterprise SLA environments with high failure penalties ($C_{FN} = \$500$), proactive machine learning predictions eliminate catastrophic ungraceful crashes, drastically reducing RAID rebuild network overhead, emergency on-call toil, and potential data loss.
@@ -2373,15 +2458,18 @@ This capstone project presented a comprehensive, end-to-end predictive machine l
 
 1. **Elimination of Operational Toil:** By transitioning from reactive hardware hot-swaps to scheduled, automated maintenance queues, the model directly reduces repetitive emergency operations, aligning with core Google SRE principles.
 2. **Error Budget & SLO Protection:** Automated data evacuation (*drain mode*) triggered by high-confidence predictions prevents background storage rebuilds from saturating system I/O and degrading end-user query latencies.
-3. **Reproducible "Design by Constraint":** Demonstrating that enterprise-scale telemetry datasets (>13 million daily logs) can be successfully processed, engineered, and modeled within a restricted virtual machine environment (6 GB RAM, 4 CPUs) validates the feasibility of lightweight AIOps pipelines.
+3. **Reproducible "Design by Constraint":** Demonstrating that a full quarter of enterprise-scale telemetry (>13 million daily logs) can be successfully processed, engineered, and modeled within a restricted virtual machine environment (6 GB RAM, 4 CPUs) validates the feasibility of lightweight AIOps pipelines.
 
 ## Limitations
 
 Despite these strong results, several operational and technical constraints were identified:
 
 * **Hardware Heterogeneity:** Failure dynamics vary substantially across drive manufacturers and capacities (e.g., higher baseline failure rates in aging 12 TB drives compared to 16 TB models). A unified global model may require model-specific recalibration.
-* **Binary Horizon vs. Continuous RUL:** Binary classification discretizes degradation into fixed time windows ($H = 7$), losing granular time-to-failure dynamics.
+* **Binary Horizon vs. Continuous RUL:** Binary classification discretizes degradation into fixed time windows ($H = 14$), losing granular time-to-failure dynamics.
 * **Telemetry Granularity:** Daily S.M.A.R.T. snapshots do not capture sub-daily burst failures or high-frequency telemetry spikes occurring between log intervals.
+* **Probability Calibration Assumption:** The economic cost-optimization analysis (Section 5.3) recovers calibrated failure probabilities from the XGBoost model using a fixed prior-correction constant (assumed positive-class prevalence of 0.04%). This correction was originally designed for models trained on resampled or undersampled datasets, whereas the XGBoost classifier was trained on the full imbalanced dataset using scale_pos_weight-based loss reweighting rather than resampling. Applying the same correction formula in this context is a simplifying assumption that was not independently validated (e.g., via a reliability/calibration curve or Brier score) and should be revisited in future iterations of this pipeline.
+* **Temporal Continuity of Rolling Features:** The 7-day SMART deltas ($\Delta_7$) are computed via a fixed row-based lag (shift(x, 7)) grouped by drive serial number, implicitly assuming uninterrupted daily telemetry per drive. Gaps in reporting (e.g., missing daily snapshots) would cause the $\Delta_7$ features to reflect a longer or shorter elapsed time than intended. This assumption was not explicitly verified against the raw ingestion logs and constitutes a data-quality risk worth auditing in future work.
+* **Asymmetric Training Regimes Between Models:** The baseline Logistic Regression was trained on a subsampled dataset (1 positive : 20 negative ratio), while the XGBoost classifier was trained on the full, highly imbalanced training set. Although both models are evaluated on the same untouched temporal test set, this difference in training data composition means the AUC-ROC and PR-AUC comparison, while informative, does not isolate the algorithmic contribution of XGBoost from the effect of its different training regime.
 
 ## Future Work & Next Steps
 
@@ -2401,7 +2489,7 @@ To extend this research and prepare the framework for production enterprise depl
    
 ---
 
-Ultimately, this capstone demonstrates that proactive machine learning is not merely a predictive exercise, but a strategic imperative for modern infrastructure resilience. By transforming noisy hardware telemetry into actionable operational intelligence, this framework bridges the gap between data science and Site Reliability Engineering—proving that high-availability cloud storage can be sustained efficiently, systematically, and at enterprise scale.
+Ultimately, this capstone demonstrates that proactive machine learning is not merely a predictive exercise, but a strategic imperative for modern infrastructure resilience. By transforming noisy hardware telemetry into actionable operational intelligence, this framework bridges the gap between data science and Site Reliability Engineering ; proving that high-availability cloud storage can be sustained efficiently, systematically, and at enterprise scale.
 
 \newpage
 
@@ -2423,6 +2511,34 @@ Majors, C., Fong-Jones, L., & Miranda, G. (2022). *Observability Engineering: Ac
 Pinheiro, E., Weber, W. D., & Barroso, L. A. (2007). Failure trends in a large disk drive population. *Proceedings of the 5th USENIX Conference on File and Storage Technologies (FAST '07)*, 17–28.
 
 Thurgood, B., & Treverton, M. (2018). *Proactive Infrastructure Maintenance in Distributed Cloud Architectures*. IEEE Cloud Engineering Series.
+
+\newpage
+
+# Appendices {-}
+
+## Appendix A: Overview of the S.M.A.R.T. Protocol and Attribute Taxonomy {-}
+
+The S.M.A.R.T. (Self-Monitoring, Analysis and Reporting Technology) system is now one of the cornerstones of monitoring the integrity of magnetic storage media. Developed as part of the ATA/ATAPI specifications, it aims to provide a set of internal indicators that enable the anticipation of mechanical, electronic or software failures that may affect a hard disk. Although these attributes are standardised in structure, they remain partly dependent on manufacturers’ specific implementations, which explains the coexistence of a common core of indicators and a series of proprietary extensions.
+
+### Physical and Sector Error Metrics {-}
+
+At the heart of this system, several metrics stand out for their predictive value. The **Reallocated Sectors Count** attribute, for example, quantifies the number of physical sectors deemed defective and replaced by spare sectors. A gradual increase in this value constitutes a major warning sign, indicating a deterioration of the magnetic surface. 
+
+Similarly, the **Current Pending Sector Count** tracks unstable sectors awaiting remapping. These sectors, which intermittently fail to read or write data, are strongly correlated with imminent failures, as demonstrated by longitudinal studies conducted by Google and NetApp.
+
+Attributes relating to uncorrected errors, such as **Reported Uncorrectable Errors** or **Offline Uncorrectable**, provide insight into the limitations of ECC correction mechanisms. Their presence indicates that certain anomalies exceed the drive’s internal correction capabilities, which is a critical indicator of potential data loss. 
+
+### Environmental and Mechanical Metrics {-}
+
+In addition to these measures, there are environmental metrics, such as **internal temperature**, whose fluctuations directly influence the mechanical stability of the platters and the precision of the read head.
+
+Mechanical attributes, such as **Spin-Up Time**, **Seek Error Rate**, or **Load/Unload Cycle Count**, enable the assessment of wear and tear on moving parts. An increase in spin-up time or a higher frequency of head positioning errors often indicates motor fatigue or ageing of the actuator mechanism. These indicators are particularly useful in environments where drives are subjected to frequent power cycles or vibrations, such as industrial facilities or mobile workstations.
+
+### Interface and System Integration {-}
+
+Finally, some attributes do not reflect a fault with the drive itself, but rather external disturbances. This is the case with the **UDMA CRC Error Count**, which signals transmission errors on the SATA interface. Although it may be interpreted as a symptom of deterioration, it most often indicates a faulty cable or an unstable connector, serving as a reminder that S.M.A.R.T. analysis must always be contextualised within the overall hardware ecosystem.
+
+Thus, the set of S.M.A.R.T. metrics forms a comprehensive monitoring system, the relevance of which depends on a combined interpretation of the indicators. Taken in isolation, certain attributes may seem trivial or ambiguous; but when analysed together, they enable an accurate diagnosis of the drive’s condition, allow failures to be anticipated, and guide preventive maintenance strategies. From both an academic and an operational perspective, a thorough understanding of these metrics is an essential prerequisite for any approach to reliability, resilience or the lifecycle management of storage infrastructure.
 
 \newpage
 \newpage
