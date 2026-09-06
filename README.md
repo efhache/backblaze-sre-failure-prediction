@@ -46,6 +46,10 @@ This repository is organized to distinguish between the development pipeline, mo
 
 ## Repository Structure
 
+The project follows a modular pipeline architecture orchestrated through main.R, where each processing stage is executed as an independent R process.
+
+The modular architecture is not solely a software engineering choice. It also serves as a memory-management strategy, allowing each pipeline stage to execute in a separate R process and fully release RAM upon completion. This design was adopted specifically to remain compatible with the project execution environment (6 GB RAM virtual machine) while processing the large-scale Backblaze Q1 2024 dataset
+
 ```text
 .
 ├── R/                                                                            # Modular R pipeline scripts
