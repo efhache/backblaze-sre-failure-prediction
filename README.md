@@ -21,7 +21,8 @@ This repository is organized to distinguish between the development pipeline, mo
 
 * [Predictive_HardDrive_Failure_modeling_for_SRE_Operations.pdf](./Predictive_HardDrive_Failure_modeling_for_SRE_Operations.pdf) : **Final Publication.** The formal academic and technical report detailing the SRE failure prediction methodology, cost-matrix optimization, and empirical findings in a publication-ready layout.
 * [Predictive_HardDrive_Failure_modeling_for_SRE_Operations.Rmd](./Predictive_HardDrive_Failure_modeling_for_SRE_Operations.Rmd) : **The Refined Version.** The primary R Markdown source document used to render the final manuscript, seamlessly integrating code, statistical outputs, and analytical discussions.
-* [R/main.R](./R/main.R) : **The Laboratory.** The main orchestrator script executing the full end-to-end "under the hood" workflow — from automated telemetry ingestion and temporal feature engineering ($\Delta_7$) to XGBoost training and SRE cost-sensitive threshold tuning.
+* [R/main.R](./R/main.R) : **The Laboratory.** The main orchestrator script executing the full end-to-end "under the hood" workflow. From automated telemetry ingestion and temporal feature engineering ($\Delta_7$) to XGBoost training and SRE cost-sensitive threshold tuning.
+* [Predictive_HardDrive_Failure_modeling_for_SRE_Operations_all_in_one.R](./R/predictive_hdd_failure_pipeline_all_in_one.R) : **Artifact.** A consolidated standalone implementation reproducing the complete analytical workflow within a single executable script. While functionally equivalent to the modular pipeline, this version executes all stages within the same R session and consequently requires substantially more memory. It is provided primarily for reproducibility and submission purposes; the modular `main.R` architecture remains the recommended implementation for resource-constrained environments.
 
 ## Key Highlights & Empirical Results
 
