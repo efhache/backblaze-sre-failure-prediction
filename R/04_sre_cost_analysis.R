@@ -188,7 +188,7 @@ write.csv(sre_summary_scenarios, file.path(PATH_METRICS, "sre_cost_optimization_
 cat("\nSummary exported to 'outputs/metrics/sre_cost_optimization_summary.csv'\n")
 
 # ==============================================================================
-# 5. Benchmark de Latence d'Inférence Réelle & Export
+# 5. Real Inference Latency Benchmark & Export
 # ==============================================================================
 cat("\n--- Benchmark Latency & Operational Summary Export ---\n")
 
@@ -213,7 +213,7 @@ if (!"capacity_tb" %in% names(bench_dt)) {
   if ("capacity_bytes" %in% names(bench_dt)) {
     bench_dt[, capacity_tb := capacity_bytes / 1e12]
   } else {
-    bench_dt[, capacity_tb := 12] # Valeur par défaut moyenne en TB
+    bench_dt[, capacity_tb := 12] # default average value of capacity in TB
   }
 }
 # Replacing NA values with 0 for the calculation

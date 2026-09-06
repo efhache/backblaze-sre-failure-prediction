@@ -57,7 +57,7 @@ ggsave(file.path(PATH_FIGS, "fig1_class_imbalance.png"), plot = p1, width = 8, h
 # ==============================================================================
 cat("--- Generating Figure 2: Failure Rate by Drive Model ---\n")
 
-# Nettoyage
+# cleanup
 dt_clean_model <- dt[!is.na(model) & trimws(as.character(model)) != ""]
 
 # Calcul des statistiques
@@ -67,12 +67,12 @@ model_stats <- dt_clean_model[, .(
   Failure_Rate_pct = (sum(as.numeric(failure), na.rm = TRUE) / .N) * 100
 ), by = model][order(-Total_Obs)]
 
-# On garde le Top 10 au maximum pour garder un graphique clair
+# We keep at most the top 10 for visualization clarity
 top_n_models <- min(10, nrow(model_stats))
 model_stats_top <- model_stats[1:top_n_models]
 model_stats_top[, model := factor(model, levels = model[order(Failure_Rate_pct)])]
 
-# Sous-titre dynamique selon le nombre de modèles trouvés
+# Dynamic subtitle based on the number of deteected models
 sub_title_f2 <- sprintf("Daily failure rates for top %d models by volume (out of %d total models)", 
                         top_n_models, nrow(model_stats))
 
@@ -138,8 +138,8 @@ cat("--- Generating Figure 4: S.M.A.R.T. Correlation Heatmap ---\n")
 
 # Targeted list: 5 critical failure attributes + 2 checks + key deltas + target
 smart_cols <- c(
-  "smart_5_raw", "smart_187_raw", "smart_196_raw", "smart_197_raw", "smart_198_raw", # Critiques bruts
-  "smart_9_raw", "smart_194_raw",                                                  # Contrôles
+  "smart_5_raw", "smart_187_raw", "smart_196_raw", "smart_197_raw", "smart_198_raw", # raw critical
+  "smart_9_raw", "smart_194_raw",                                                  # Controles
   "smart_5_delta7", "smart_187_delta7", "smart_197_delta7"                         # Deltas
 )
 
