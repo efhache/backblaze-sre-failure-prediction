@@ -21,12 +21,12 @@ header-includes:
         
         \vspace{0.5cm}
         \LARGE
-        A Machine Learning Approach to Infrastructure Reliability
+        A Cost-Sensitive Machine Learning Framework Bridging Predictive Maintenance and Site Reliability Engineering
         
         \vfill
         
         \large
-        A REPORT PRESENTED \\
+        A CAPSTONE PROJECT REPORT PRESENTED \\
         BY \\
         \textbf{FABIAN HIERNAUX} \\
         TO \\
@@ -36,9 +36,8 @@ header-includes:
         
         IN PARTIAL FULFILLMENT OF THE REQUIREMENTS \\
         FOR THE \\
-        \textbf{PROFESSIONAL CERTIFICATE} \\
-        IN THE SUBJECT OF \\
-        \textbf{DATA SCIENCE}
+        \textbf{HARVARDX PROFESSIONAL CERTIFICATE} \\
+        IN \textbf{DATA SCIENCE}
         
         \vfill
         
@@ -54,9 +53,10 @@ header-includes:
 
 ## I. Context & Operational Challenge {-}
 Modern cloud storage infrastructure relies on high-density hard disk drive (HDD) deployments to manage exabyte-scale data. In a Site Reliability Engineering (SRE) context, unannounced drive failures induce operational toil, saturate network bandwidth during ungraceful RAID rebuilds, and risk Service Level Objective (SLO) violations. This capstone project addresses this operational challenge by designing an end-to-end, cost-sensitive machine learning framework using Backblaze Q1 2024 quarterly telemetry (>13 million filtered daily observations) to forecast drive failures prior to catastrophic breakdown.
+Beyond the predictive modeling objective itself, this project also serves as a practical proof-of-concept for the adoption of Site Reliability Engineering (SRE) principles within infrastructure operations. By demonstrating how large-scale telemetry can be transformed into actionable maintenance decisions, the study evaluates the technical feasibility, operational relevance, and potential business value of predictive maintenance as an enabler of proactive reliability management.
 
 ## II. Predictive Strategy & System Design {-}
-To balance early warning capabilities with high signal confidence, the target failure horizon was optimized at **$H = 14$ days**. This window provides automated distributed orchestrators (e.g., Ceph, Google Colossus) adequate lead time to gracefully drain data blocks off failing drives while maintaining an optimal signal-to-noise ratio. 
+To balance early warning capabilities with high signal confidence, the target failure horizon was determined to be **$H = 14$ days** based on operational considerations. This window provides automated distributed orchestrators (e.g., Ceph, Google Colossus) adequate lead time to gracefully drain data blocks off failing drives while maintaining an optimal signal-to-noise ratio. 
 
 To capture non-linear drive degradation dynamics, static point-in-time S.M.A.R.T. metrics were augmented with 7-day dynamic rolling deltas ($\Delta_7$) across critical indicators:
 
@@ -151,6 +151,7 @@ In my professional environment, our organisation is currently engaged in a strat
 As our internal storage systems do not yet expose publicly accessible historical telemetry suitable for academic experimentation, the HarvardX Data Science Professional Certificate capstone offered an ideal opportunity to explore this challenge using a highquality, openly available dataset. For this purpose, I selected the Backblaze Hard Drive Stats dataset, one of the most widely used public sources of largescale S.M.A.R.T. telemetry. Backblaze is a cloudbackup provider operating tens of thousands of consumergrade hard drives, and since 2013 the company has published daily operational snapshots (including failures, model information, and detailed S.M.A.R.T. metrics) to support research in reliability engineering, predictive maintenance, and largescale storage behaviour analysis.
 
 The choice of topic (predicting imminent hard drive failures within a 14to30day horizon) therefore emerged naturally from the intersection between the academic objectives of the HarvardX programme and the operational challenges currently under discussion within my organisation. This report thus serves a dual purpose: it satisfies the capstone requirements of the HarvardX Data Science Professional Certificate, and it contributes to our ongoing reflection on how data science, observability, and machine learning can support the adoption of modern SRE practices and enable proactive infrastructure reliability.
+Beyond its academic objectives, the project functions as a feasibility study for predictive maintenance within an SRE transformation context. The intention is not merely to assess forecasting performance, but also to evaluate whether telemetry-driven risk prediction can realistically support operational decision-making, reduce reactive interventions, and contribute to the broader shift toward proactive reliability engineering.
 
 ## Research Question
 
@@ -201,7 +202,7 @@ The following chapter explores these foundations in greater depth by presenting 
 
 Empirical studies from Google (Pinheiro et al., 2007) and NetApp (Bairavasundaram et al., 2008) established that individual S.M.A.R.T. attributes (such as Scan Errors, Reallocation Counts, Offline Reallocations, and Probational Counts) significantly increase 60-day failure probability (up to 39x). However, Pinheiro et al. (2007) also demonstrated that 56% of failed drives exhibited zero warnings across all critical S.M.A.R.T. parameters prior to failure, highlighting the limits of static rules and the need for non-linear machine learning models capable of capturing subtle temporal degradation trends.
 
-To address this challenge, this project leverages real-world telemetry provided by Backblaze, containing daily operational snapshots and S.M.A.R.T. attributes across hundreds of thousands of hard drives. The core goal is to build, evaluate, and interpret supervised machine learning models capable of forecasting hard drive failure within a 7-to-30-day look-ahead window.
+To address this challenge, this project leverages real-world telemetry provided by Backblaze, containing daily operational snapshots and S.M.A.R.T. attributes collected from large-scale production storage environments. The objective is to build, evaluate, and interpret supervised machine learning models capable of predicting whether a hard drive will fail within the next 14 days.
 
 To achieve this, the project establishes an end-to-end data pipeline in R:
 
@@ -209,7 +210,7 @@ To achieve this, the project establishes an end-to-end data pipeline in R:
 * Exploratory Data Analysis (EDA) focused on extreme class imbalance (< 1% failure rate), missingness, and failure trends across drive models.
 * Feature engineering, including target label propagation (will_fail within $H$ or $\Delta t$ days) and rolling temporal deltas to capture non-linear telemetry drifts.
 * Class imbalance mitigation using strategic down-sampling techniques.
-* Comparative modeling evaluating a baseline Logistic Regression model against ensemble decision trees (Random Forest and XGBoost).
+* Comparative modeling evaluating a baseline Logistic Regression model and an advanced XGBoost classifier.
 * Model evaluation & Explainability (XAI) using SRE-relevant metrics (Recall, Precision, PR-AUC) and feature importance analysis (e.g., SHAP values) to identify top failure predictors.
 
 ## Design by Constraint: VM Computational Strategy
@@ -322,9 +323,6 @@ In conclusion, the integration of a SMART predictive hardware telemetry tool lie
 \newpage
 
 # Methods and Analysis {#sec-methodology}
-
-This chapter presents the end-to-end Machine Learning pipeline developed for predictive maintenance, detailing the data ingestion workflow, feature engineering transformations, down-sampling strategies, and model architecture. The framework is designed for high-dimensional and highly imbalanced telemetry, with the objective of forecasting drive failures within a proactive maintenance window while minimizing false alarms and unnecessary operational interventions.
-Following established literature (Pinheiro et al.; Schroeder & Gibson), raw drive telemetry was filtered to focus on 5 critical hardware failure predictors: SMART 5 (Reallocated Sectors), 187 (Reported Uncorrectable Errors), 196 (Reallocation Events), 197 (Current Pending Sectors), and 198 (Offline Uncorrectable Sectors).
 
 This chapter presents the end-to-end Machine Learning pipeline developed for predictive maintenance, detailing the data ingestion workflow, feature engineering transformations, down-sampling strategies, and model architecture. The framework is designed for high-dimensional and highly imbalanced telemetry, with the objective of forecasting drive failures within a proactive maintenance window while minimizing false alarms and unnecessary operational interventions.
 Following established literature (Pinheiro et al.; Schroeder & Gibson), raw drive telemetry was filtered to focus on 5 critical hardware failure predictors: SMART 5 (Reallocated Sectors), 187 (Reported Uncorrectable Errors), 196 (Reallocation Events), 197 (Current Pending Sectors), and 198 (Offline Uncorrectable Sectors).
@@ -2460,6 +2458,8 @@ This capstone project presented a comprehensive, end-to-end predictive machine l
 2. **Error Budget & SLO Protection:** Automated data evacuation (*drain mode*) triggered by high-confidence predictions prevents background storage rebuilds from saturating system I/O and degrading end-user query latencies.
 3. **Reproducible "Design by Constraint":** Demonstrating that a full quarter of enterprise-scale telemetry (>13 million daily logs) can be successfully processed, engineered, and modeled within a restricted virtual machine environment (6 GB RAM, 4 CPUs) validates the feasibility of lightweight AIOps pipelines.
 
+As mentioned in the introduction, in addition to the predictive performance achieved in this study, the project demonstrates the practical feasibility of integrating machine learning into SRE-focused maintenance processes. The results suggest that predictive maintenance can move beyond being merely a theoretical concept of reliability to become a concrete operational capability, capable of supporting data-driven decision-making, maintenance planning and proactive infrastructure governance.
+
 ## Limitations
 
 Despite these strong results, several operational and technical constraints were identified:
@@ -2486,6 +2486,9 @@ To extend this research and prepare the framework for production enterprise depl
 
 4. **Cross-Fleet Generalization & Transfer Learning:**
    Investigating domain adaptation and transfer learning techniques to adapt trained models across heterogeneous storage fleets, different operating environments, or solid-state drive (SSD) telemetry datasets where failure modes fundamentally differ from mechanical HDDs.
+   
+5. **Ensemble Learning Benchmark Expansion:**
+   Future model extensions could include benchmarking additional ensemble approaches such as Random Forests, LightGBM, CatBoost, or Temporal Convolutional Networks in order to further assess the trade-off between predictive performance, explainability, and computational efficiency under constrained infrastructure environments.
    
 ---
 
@@ -2597,11 +2600,11 @@ This work was conducted within the \textbf{HarvardX / edX Professional Certifica
 \small
 \textbf{Author:} HIERNAUX Fabian \\
 \textbf{Program:} Professional Certificate in Data Science (HarvardX / edX) \\
-\textbf{Program URL:} \textcolor{white}{https://www.edx.org/certificates/professional-certificate/harvardx-data-science} \\
-\textbf{Harvard Portal:} \textcolor{white}{https://pll.harvard.edu/} \\
+\textbf{Program URL:} \textcolor{white}{https://harvardonline.harvard.edu/program/data-science} \\
+\textbf{Harvard Portal:} \textcolor{white}{https://harvardonline.harvard.edu/} \\
 \textbf{Repository:} \textcolor{white}{https://github.com/efhache/backblaze-sre-failure-prediction} \\
 \textbf{LinkedIn:} \textcolor{white}{https://www.linkedin.com/in/fabianhiernaux} \\
-\textbf{Date:} August 2026
+\textbf{Date:} August-September 2026
 \end{quote}
 
 \vspace*{0.3cm}
