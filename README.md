@@ -61,7 +61,9 @@ The modular architecture is not solely a software engineering choice. It also se
 │   ├── 03_model_evaluation.R                                                     # Performance evaluation (ROC & Precision-Recall curves)
 │   ├── 04_sre_cost_analysis.R                                                    # SRE cost matrix optimization ($C_FN vs $C_FP) & threshold tuning
 │   ├── 05_model_interpretability.R                                               # Feature importance & SHAP model explainability analysis
-│   └── main.R                                                                    # Master orchestrator script (executes full end-to-end pipeline)
+│   ├── main.R                                                                    # Master orchestrator script (executes full end-to-end pipeline)
+│   └──  Predictive_HardDrive_Failure_modeling_for_SRE_Operations_all_in_one.R    # Consolidated single-file reproducibility pipeline
+│
 ├── outputs/                                                                      # Generated pipeline artifacts
 │   ├── figures/                                                                  # High-resolution PNG plots for report and README
 │   │   ├── fig1_class_imbalance.png
@@ -76,6 +78,7 @@ The modular architecture is not solely a software engineering choice. It also se
 │   │   └── fig10_shap_feature_importance.png
 │   └── models/                                                                   # Saved model artifacts and serialized binaries
 │       └── model_xgboost.model
+│
 ├── Predictive_HardDrive_Failure_modeling_for_SRE_Operations.Rmd                  # Comprehensive R Markdown manuscript source
 ├── Predictive_HardDrive_Failure_modeling_for_SRE_Operations.pdf                  # Rendered PDF report (Final HarvardX Capstone deliverable)
 ├── capstone_report_files/                                                        # Auxiliary LaTeX rendering assets for Rmd compilation
