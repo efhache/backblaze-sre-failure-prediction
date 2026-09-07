@@ -1967,12 +1967,15 @@ $$\min_{p^*} \; C_{\text{total}}(p) = (FN \cdot C_{FN}) + (FP \cdot C_{FP}) + (T
 
 Under asymmetric cost structures where unmitigated hard drive failures ($C_{FN}$) carry exponentially higher enterprise penalties than proactive drive replacements ($C_{TP}, C_{FP}$), this cost-centric calibration directly aligns the model's decision boundary with operational SRE priorities, bypassing the need for explicit probability re-scaling.
 
-### Operational Sensitivity Analysis across Infrastructure Scenarios
+### Operational Sensitivity Analysis across Infrastructure Scenarios {#sec-sensitivity}
 
 To quantify the financial impact across different operational environments, two distinct business scenarios were evaluated against a Reactive Baseline Strategy ($C_{FN} \times \text{Total Failures}$, assuming zero machine learning deployment):
 
 * **Scenario A: Standard Hardware Model ($C_{FN} = \$100$):** Reflects standard commoditized server hardware replacement costs without strict customer SLA penalties. Because $C_{FP} = \$15$ represents a significant fraction of $C_{FN}$, false alarms are heavily penalized.
 * **Scenario B: Enterprise SLA / High-Availability Model ($C_{FN} = \$500$):** Reflects mission-critical enterprise environments where unexpected drive failures trigger priority incidents, degraded array performance, and potential SLA breaches.
+
+**Justification of SRE Cost Weights ($C_{FN} = \$500$ vs $C_{FP} = \$15$):**
+The operational cost parameters assigned to False Negatives ($C_{FN} = \$500$) and False Positives ($C_{FP} = \$15$) serve as normalized economic weights derived from site reliability engineering literature and error-budget accounting models. $C_{FN}$ encapsulates emergency engineering toil, network bandwidth saturation during ungraceful rebuilds, and potential Service Level Objective (SLO) violation penalties. Conversely, $C_{FP}$ represents unnecessary technician intervention and diagnostic testing overhead. These values reflect relative operational trade-offs rather than rigid accounting line-items; sensitivity analysis across Scenarios A and B demonstrates that the cost-minimizing threshold ($\tau^*$) remains robust across a 5x increase in penalty severity (from $\$100/\$15 \approx 6.7:1$ up to $\$500/\$15 \approx 33.3:1$). Furthermore, under extreme class imbalance ($\pi \approx 0.04\%$), this cost-sensitive threshold framework directly complements PR-AUC evaluation by translating precision metrics into actionable financial savings.
 
 ```{r sre_cost_optimization_curve, echo=FALSE, fig.cap="SRE Total Maintenance Cost vs. Calibrated Probability Thresholds for Standard ($100 FN) and Enterprise SLA ($500 FN) Infrastructure Scenarios", out.width="85%", fig.align="center", fig.pos="H"}
 knitr::include_graphics("outputs/figures/fig9_sre_cost_optimization.png")
@@ -2295,6 +2298,10 @@ knitr::kable(
 
 **Inter‑Model Robustness and Dominance Bias:  **
 Given the structural fleet heterogeneity identified in Section 4.1 (where a small subset of drive models accounts for the majority of observations), training a unified global model risks performance bias toward dominant hardware models. To evaluate sub-fleet robustness, model metrics (Precision, Recall, ROC-AUC) were disaggregated by drive model. While the top-represented models dictate baseline feature importance, performance across lower-count models remained stable, confirming that physical SMART degradation signatures (e.g., sector corruption) generalize across hardware revisions.
+
+**Precision-Recall AUC ($0.0516$) in Extreme Imbalance Settings:**
+While an absolute PR-AUC of $0.0516$ may appear low in standard classification contexts, it represents a **129-fold Precision Lift** over the baseline random classifier ($\pi \approx 0.0004$ daily failure prevalence). In extreme rare-event settings, traditional ROC-AUC can be overly optimistic due to the overwhelming number of True Negatives. The PR-AUC provides an unvarnished evaluation of predictive power. Operationally, a precision of $\approx 5\%$ at high recall ($\ge 70\%$) is highly effective for SRE teams: a False Positive merely triggers an automated, non-disruptive background task (drain mode / VM live migration), whereas a False Negative leads to catastrophic hardware failure, ungraceful RAID rebuilds, and human on-call toil.
+As detailed in Section \ref{sec-sensitivity}, sensitivity analysis confirms that the optimal cost-minimizing threshold ($\tau^* \approx 0.012$) remains robust across a 5x increase in penalty severity ($6.7:1 \le C_{FN}/C_{FP} \le 33.3:1$).
 
 ## Error Analysis and Feature Importance
 

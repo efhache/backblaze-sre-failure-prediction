@@ -26,6 +26,28 @@
 # This script is provided solely as a single-file reproducibility artifact.
 ###############################################################################
 
+
+
+# ==============================================================================
+# PIPELINE CONFIGURATION
+# ==============================================================================
+# DEMO_MODE <- TRUE: Fast mode for a quick peer review (< 2 mins, < 2 GB RAM)
+# DEMO_MODE <- FALSE: Full Production Mode (Exact reconstruction of the PDF, ~13M+ lines)
+DEMO_MODE <- TRUE
+
+cat("==================================================================\n")
+cat(sprintf("   RUNNING BACKBLAZE AIOPS PIPELINE (DEMO_MODE = %s)\n", DEMO_MODE))
+cat("==================================================================\n")
+if (DEMO_MODE) {
+  cat("  [INFO] Fast execution enabled: Single model target & 15 XGBoost trees.\n")
+  cat("  [INFO] Execution time: < 2 mins | Memory usage: < 2 GB RAM.\n")
+  cat("  [INFO] Set DEMO_MODE <- FALSE for full 13M+ row evaluation.\n")
+}
+cat("==================================================================\n\n")
+
+
+
+
 ################################################################################
 # SECTION 0 - LIBRARIES
 ################################################################################
@@ -233,8 +255,15 @@ local({
   # ==============================================================================
   cat("\n--- Filtering top drive models to reduce noise ---\n")
   
-  # Keep top drive models representing majority of the population
-  top_model_names <- top_10_models[1:5, model]
+  if (DEMO_MODE) {
+    cat("--> [DEMO_MODE] Restricting processing to 1 single drive model (ST12000NM0007)\n")
+    # Conserve uniquement le modèle le plus représentatif (~20% du dataset total, idéal pour la RAM)
+    top_model_names <- top_10_models[1, model]
+  } else {
+    # Keep top drive models representing majority of the population
+    top_model_names <- top_10_models[1:5, model]
+  }
+  
   dt_filtered <- dt_raw[model %in% top_model_names]
   
   # Free up memory from raw data
@@ -700,6 +729,9 @@ local({
   # ==============================================================================
   cat("\n--- Training Model 2: XGBoost Classifier (Full 8.5M Train Set) ---\n")
   
+  # Adapt nrounds to DEMO_MODE
+  n_trees <- if (DEMO_MODE) 15 else 100
+  
   # Prepare DMatrix objects
   dtrain <- xgb.DMatrix(
     data  = as.matrix(train_dt[, ..feature_cols]), 
@@ -732,10 +764,10 @@ local({
   xgb_model <- xgb.train(
     params                = xgb_params,
     data                  = dtrain,
-    nrounds               = 100,
+    nrounds               = n_trees,
     watchlist             = list(train = dtrain, eval = dtest),
     early_stopping_rounds = 10,
-    print_every_n         = 20
+    print_every_n         = if (DEMO_MODE) 5 else 20
   )
   
   # Feature Importance & Metrics Export
@@ -1196,7 +1228,7 @@ local({
   cat("Calculating SHAP values using native XGBoost C++ engine...\n")
   
   set.seed(42)
-  sample_size <- min(20000, nrow(X_test))
+  sample_size <- if (DEMO_MODE) 2000 else min(20000, nrow(X_test))
   sample_idx  <- sample(seq_len(nrow(X_test)), size = sample_size)
   X_sample    <- X_test[sample_idx, ]
   
