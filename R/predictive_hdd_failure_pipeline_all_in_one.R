@@ -33,7 +33,7 @@
 # ==============================================================================
 # DEMO_MODE <- TRUE: Fast mode for a quick peer review (< 2 mins, < 2 GB RAM)
 # DEMO_MODE <- FALSE: Full Production Mode (Exact reconstruction of the PDF, ~13M+ lines)
-DEMO_MODE <- TRUE
+DEMO_MODE <- FALSE
 
 cat("==================================================================\n")
 cat(sprintf("   RUNNING BACKBLAZE AIOPS PIPELINE (DEMO_MODE = %s)\n", DEMO_MODE))
