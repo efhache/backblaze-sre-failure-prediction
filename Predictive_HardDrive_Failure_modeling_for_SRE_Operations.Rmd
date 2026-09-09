@@ -2237,6 +2237,8 @@ Global feature importance evaluates the relative contribution of each SMART attr
 knitr::include_graphics("outputs/figures/fig10_shap_feature_importance.png")
 ```
 
+\newpage
+
 **Collinearity Control and Temporal Stability of SHAP Attributions:  **
 
 Prior to interpreting TreeSHAP values, feature collinearity was explicitly audited (Section 4.2). Highly redundant metrics ($\rho > 0.80$) were pruned or aggregated into temporal deltas ($\Delta_7$), preventing SHAP importance dilution across collinear predictors. Furthermore, while TreeSHAP provides global and local attributions for the test evaluation window, temporal stability (evaluating whether SHAP feature rankings drift across quarters, drive cohorts or firmware updates) represents a critical safeguard for long-term operational deployment. Extending the analysis to quarterly SHAP stability checks would strengthen confidence in the model’s interpretability under real‑world telemetry drift.
