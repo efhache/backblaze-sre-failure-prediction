@@ -111,6 +111,8 @@ Rscript main.R
 The models are trained and evaluated on open-source enterprise telemetry provided by Backblaze:
 
 * **Source:** Backblaze Hard Drive Data and Stats
+  * **Data Source URL:** [https://f001.backblazeb2.com/file/Backblaze-Hard-Drive-Data/data_Q1_2024.zip](https://f001.backblazeb2.com/file/Backblaze-Hard-Drive-Data/data_Q1_2024.zip)
+  * **Note:** While the raw dataset can be accessed directly via the link above, you do not need to download it manually. The automated ingestion script (R/00_download_and_ingest.R) handles the downloading, extraction, and formatting seamlessly.
 * **Scope:** Multi-year daily drive operational status, failure indicators, and S.M.A.R.T. telemetry attributes.
 * **Preprocessing:** Filtering for enterprise models, temporal partitioning (out-of-time validation split), and missing value imputations.
 * **Validation Strategy:** Out-of-Time (OOT) temporal validation split (Training: Jan–Feb 2024 | Testing: March 2024) to eliminate data leakage.
