@@ -87,7 +87,9 @@ This capstone project represents the culmination of an intensive, self-directed 
 
 Pursuing this advanced curriculum via distance learning while balancing active professional responsibilities (combining freelance commitments with business management) alongside family life at a more mature stage of my career was a significant undertaking. Navigating these overlapping demands, late-night study sessions, and work schedules proved to be a grueling balancing act, but ultimately an immensely rewarding personal and intellectual challenge.
 
-I extend my appreciation to **Backblaze** for providing public access to their enterprise-grade telemetry datasets, as well as to the open-source Data Science and Site Reliability Engineering (SRE) communities whose tools and operational frameworks made this work possible.
+I extend my appreciation to Backblaze for providing public access to their enterprise-grade telemetry datasets, as well as to the open-source Data Science and Site Reliability Engineering (SRE) communities whose tools and operational frameworks made this work possible.
+
+I would like to express my sincere gratitude to my parents for their invaluable help with proofreading and English language correction. I also warmly thank my colleague Andrea for her insightful review, which helped clarify several points that were obvious to me but needed greater accessibility for the reader.
 
 Finally, my deepest and most heartfelt gratitude goes to my wife and my four children. Completing this capstone required sacrificing countless hours, weekends, and late nights ; often drawn directly from family time and holidays. I am profoundly grateful for their unwavering patience, resilience, and support throughout this journey. This achievement is as much theirs as it is mine.
 
