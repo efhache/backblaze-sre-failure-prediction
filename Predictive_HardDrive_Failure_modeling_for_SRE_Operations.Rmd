@@ -76,6 +76,9 @@ The pipeline was evaluated on an out-of-time temporal test dataset comprising ov
 ## IV. Strategic Operational Vision {-}
 By converting raw, noisy hardware telemetry into high-confidence proactive alerts, this framework establishes a direct bridge between predictive Data Science and Site Reliability Engineering. The results prove that automated data evacuation (*drain mode*) can be seamlessly integrated into cloud infrastructure pipelines to preserve error budgets and sustain system resilience at enterprise scale.
 
+## V. Operational Motivation & Risk Context {-}
+Motivated by high-stakes storage vulnerabilities, such as the critical risk where a substantial fraction of disk failures surface only during the high-stress RAID reconstruction phase, this project demonstrates the vital necessity of shifting from reactive maintenance to proactive, non-linear predictive modeling to prevent catastrophic data loss.
+
 \newpage
 
 # Acknowledgements {-}
@@ -123,6 +126,7 @@ library(ggplot2)
 | Abbreviation / Term | Definition |
 | :--- | :--- |
 | **AIOps** | **Artificial Intelligence for IT Operations:** The application of machine learning to automate and enhance IT operations and observability workflows. |
+| **ATA / ATAPI** | **Advanced Technology Attachment / ATA Packet Interface**. A hardware interface and communication protocol standard connecting storage devices (hard disk drives, SSDs) to the system bus. The ATA standard defines the standardised set of commands that enables the retrieval of S.M.A.R.T. health telemetry and the reading of raw hardware diagnostic registers without interrupting I/O operations. |
 | **AUC-ROC** | **Area Under the Receiver Operating Characteristic Curve:** A performance metric measuring a classifier's ability to distinguish between classes across all thresholds. |
 | **Backblaze** | A cloud storage and data backup provider that publicly releases daily open-source S.M.A.R.T. hard drive failure telemetry datasets. |
 | **DevOps** | **Development and Operations:** A cultural and technical movement emphasizing shared responsibility, continuous integration/continuous delivery (CI/CD), and automation to bridge the traditional gap between software development and IT operations teams. |
@@ -196,11 +200,14 @@ In summary, the proactive prediction of hard disk failures lies at the intersect
 2. the operational requirements of distributed systems,
 3. and the evolution of SRE practices towards intelligent observability.
 
+At the core of modern data center reliability lies a severe operational challenge: a critical percentage of disk failures remain undetected until a primary failure triggers the stressful RAID reconstruction phase, abruptly exposing systems to catastrophic dual-disk failures. This stark vulnerability underscores the primary motivation of this study—highlighting why traditional reactive approaches are no longer sufficient and why proactive, ML-driven predictive maintenance is urgently required.
+
 The following chapter explores these foundations in greater depth by presenting a structured literature review covering major empirical studies, critical S.M.A.R.T. metrics, silent corruption phenomena, and the theoretical frameworks used in data science for predicting hardware failures.
 
 ## Project Objectives & Dataset Overview
 
 Empirical studies from Google (Pinheiro et al., 2007) and NetApp (Bairavasundaram et al., 2008) established that individual S.M.A.R.T. attributes (such as Scan Errors, Reallocation Counts, Offline Reallocations, and Probational Counts) significantly increase 60-day failure probability (up to 39x). However, Pinheiro et al. (2007) also demonstrated that 56% of failed drives exhibited zero warnings across all critical S.M.A.R.T. parameters prior to failure, highlighting the limits of static rules and the need for non-linear machine learning models capable of capturing subtle temporal degradation trends.
+Indeed, approaches based on static rules or fixed thresholds quickly reveal their limitations: they lack flexibility in the face of normal load variations, generate significant alert fatigue (false positives) and struggle to identify slow, insidious degradations. To address these shortcomings, the use of non-linear machine learning models is essential in order to cross-reference multiple metrics and identify complex temporal trends before they lead to a system failure.
 
 To address this challenge, this project leverages real-world telemetry provided by Backblaze, containing daily operational snapshots and S.M.A.R.T. attributes collected from large-scale production storage environments. The objective is to build, evaluate, and interpret supervised machine learning models capable of predicting whether a hard drive will fail within the next 14 days.
 
@@ -235,7 +242,7 @@ It draws on two complementary datasets:
 1. large-scale empirical analyses conducted by Google (Pinheiro et al., 2007) and NetApp (Bairavasundaram et al., 2008),
 2. and conceptual frameworks derived from reliability engineering, data science and SRE practices.
 
-The aim is to situate this work within the state of the art, to identify the most relevant physical signals, and to understand the limitations of traditional approaches in order to justify the use of non-linear and temporal models.
+The aim is to situate this work within the state of the art, to identify the most relevant physical signals, and to understand the limitations of traditional approaches (specifically their rigid assumption of system linearity, their inability to capture complex long-term temporal dependencies, and the heavy calibration burden of white-box physical models) in order to justify the use of non-linear and temporal models.
 
 ## Empirical Reference Studies: From Google’s Analysis to NetApp’s Failures
 
@@ -260,10 +267,10 @@ To organise these observations, Table 1 summarises the quantitative impact of th
 
 | S.M.A.R.T. Attribute | Metric Name | Primary Physical Meaning | Failure Risk Multiplier (60 Days) |
 | :--- | :--- | :--- | :---: |
-| **S.M.A.R.T. 197** | Current Pending Sector Count | Count of unstable sectors awaiting reallocation | **39x** |
 | **S.M.A.R.T. 5** | Reallocated Sectors Count | Count of damaged physical sectors remapped | **14x** |
-| **S.M.A.R.T. 198** | Offline Uncorrectable Sector | Uncorrectable errors during background scan | **21x** |
+| **S.M.A.R.T. 197** | Current Pending Sector Count | Count of unstable sectors awaiting reallocation | **39x** |
 | **S.M.A.R.T. 196** | Reallocation Event Count | Total number of remapping operations | **16x** |
+| **S.M.A.R.T. 198** | Offline Uncorrectable Sector | Uncorrectable errors during background scan | **21x** |
 
 Table 1: *Quantitative impact of critical S.M.A.R.T. metrics on 60-day failure probability (adapted from Pinheiro et al., 2007).*
 
@@ -1001,7 +1008,7 @@ gc(verbose = FALSE)
 knitr::include_graphics("outputs/figures/fig1_class_imbalance.png")
 ```
 
-As demonstrated in Figure 1, the dataset exhibits extreme target class imbalance. Out of $13,172,916$ daily observations in the filtered Top 5 fleet, healthy operational days account for $13,167,669$ records ($99.960\%$), whereas positive failure window records ($Y_{it} = 1$) constitute only $5,247$ observations ($0.040\%$). This ratio ($\approx 2,509:1$) highlights that standard accuracy metrics would yield misleadingly high performance ($99.96\%$) for a naive baseline classifier predicting all drives as healthy. Consequently, modeling evaluation must focus strictly on Precision-Recall AUC (PR-AUC) and operational SRE cost matrices rather than accuracy or ROC-AUC alone.
+As demonstrated in Figure 1, the dataset exhibits extreme target class imbalance. Out of $13,172,916$ daily observations in the filtered Top 5 fleet, healthy operational days account for $13,167,669$ records ($99.960\%$), whereas positive failure window records ($Y_{it} = 1$) constitute only $5,247$ observations ($0.040\%$). This ratio ($\approx 2,509:1$) highlights that standard accuracy metrics would yield misleadingly high performance ($99.96\%$) for a naive baseline classifier predicting all drives as healthy. Consequently, modeling evaluation must focus strictly on Precision-Recall AUC (PR-AUC) and operational SRE cost matrices rather than accuracy or ROC-AUC alone (Receiver Operating Characteristic Area Under the Curve, which measures a classifier's ability to distinguish between classes across all decision thresholds ; see Glossary).
 
 ```{r display_fig2, echo=FALSE, out.width="85%", fig.align="center", fig.pos="H", fig.cap="Daily Failure Rate Heterogeneity across Hard Drive Models"}
 knitr::include_graphics("outputs/figures/fig2_failure_rate_by_model.png")
@@ -1032,7 +1039,9 @@ The comparative distribution analysis in Figure 3 confirms distinct physical deg
 knitr::include_graphics("outputs/figures/fig4_correlation_heatmap.png")
 ```
 
-Figure 4 presents the Spearman rank correlation matrix across key raw SMART metrics and their corresponding 7-day temporal deltas ($\Delta_7$). Three important structural collinearity patterns emerge:
+Figure 4 presents the Spearman rank correlation matrix across key raw SMART metrics and their corresponding 7-day temporal deltas ($\Delta_7$). Spearman rank correlation was explicitly selected over Pearson to evaluate these relationships because raw S.M.A.R.T. metrics are heavily zero-inflated, non-normally distributed, and subject to extreme non-linear spikes; unlike Pearson (which assumes strict linearity and is sensitive to skewness), Spearman robustly measures monotonic relationships and resists telemetry outliers
+
+From this matrix, three important structural collinearity patterns emerge:
 
 1. **Moderate Collinearity ($\rho = 0.49$) between SMART 197 (Pending Sectors) and SMART 198 (Uncorrectable Sectors):** These two indicators measure closely linked sector-level degradation dynamics. While they capture distinct stages of sector instability, their moderate positive correlation indicates shared predictive variance, validating feature selection or tree-based regularisation to prevent redundant splitting.
 
@@ -1343,14 +1352,14 @@ cat(sprintf("Predictions successfully exported to %s\n", output_preds_path))
 cat("Phase 3 Training pipeline completed successfully!\n")
 gc()
 
-# Extraction sécurisée du log d'évaluation et de l'early stopping pour le rapport
+# Secure extraction of the evaluation log and early stopping data for the report
 eval_log <- attr(xgb_model, "evaluation_log")
 b_iter   <- attr(xgb_model, "early_stop")$best_iteration
 
 b_score  <- NA_real_
 
 if (!is.null(eval_log) && nrow(eval_log) > 0) {
-  # Detection dynamique de la colonne de score d'evaluation (ignore le nom exact)
+  # Dynamic detection of the evaluation score column (ignores the exact name)
   score_col <- grep("eval|test", names(eval_log), value = TRUE)[1]
   
   if (is.null(b_iter) || is.na(b_iter)) {
@@ -1371,7 +1380,7 @@ list(
   best_score       = as.numeric(b_score)
 )
 })
-# 3. SAUVEGARDE RDS (ajoutee juste ici, hors du local)
+# 3. RDS BACKUP (added right here, outside the room)
 if (!dir.exists("outputs/models")) dir.create("outputs/models", recursive = TRUE)
 saveRDS(pipeline_metrics, "outputs/models/pipeline_metrics.rds")
 invisible(gc(verbose = FALSE))
@@ -2015,7 +2024,7 @@ if (file.exists(summary_path)) {
       "False Positives (False Alarms)",
       "False Negatives (Missed Failures)"
     ),
-    "Scenario A: Standard ($100 FN)" = c(
+    "Scenario A" = c(
       sprintf("$%d", as.integer(get_val("FN_Cost_Assigned", col_a))),
       sprintf("$%s", format(round(get_val("Reactive_Cost_USD", col_a)), big.mark = " ")),
       sprintf("$%s", format(round(get_val("Optimal_ML_Cost_USD", col_a)), big.mark = " ")),
@@ -2028,7 +2037,7 @@ if (file.exists(summary_path)) {
       format(as.integer(get_val("FP_Count", col_a)), big.mark = " "),
       format(as.integer(get_val("FN_Count", col_a)), big.mark = " ")
     ),
-    "Scenario B: Enterprise SLA ($500 FN)" = c(
+    "Scenario B" = c(
       sprintf("$%d", as.integer(get_val("FN_Cost_Assigned", col_b))),
       sprintf("$%s", format(round(get_val("Reactive_Cost_USD", col_b)), big.mark = " ")),
       sprintf("$%s", format(round(get_val("Optimal_ML_Cost_USD", col_b)), big.mark = " ")),
@@ -2046,8 +2055,8 @@ if (file.exists(summary_path)) {
 } else {
   sre_table <- data.frame(
     "Operational Metric / Financial Outcome" = "N/A",
-    "Scenario A: Standard ($100 FN)" = "N/A",
-    "Scenario B: Enterprise SLA ($500 FN)" = "N/A",
+    "Scenario A" = "N/A",
+    "Scenario B" = "N/A",
     check.names = FALSE
   )
 }
@@ -2059,7 +2068,12 @@ knitr::kable(
   align    = c("l", "r", "r"),
   caption  = "SRE Economic Cost Optimization Summary on Out-of-Time Test Set"
 ) %>%
-  kable_styling(latex_options = "HOLD_position")
+  kable_styling(latex_options = c("HOLD_position"),position = "center",font_size = 9) %>%
+footnote(
+    general = "Scenario A: Standard model with C_FN = 100 USD. Scenario B: Enterprise SLA model with C_FN = 500 USD.",
+    footnote_as_chunk = TRUE,
+    escape = TRUE
+  )
 ```
 
 ### Strategic Interpretation of Economic Results
@@ -2487,8 +2501,8 @@ To extend this research and prepare the framework for production enterprise depl
 1. **Survival Analysis & RUL Estimation:**
    Transitioning from binary window classification to parametric and non-parametric survival models (such as Cox Proportional Hazards, Random Survival Forests, or DeepHit neural architectures). This will allow estimating continuous Remaining Useful Life (RUL) probability curves $S(t)$, enabling fine-grained maintenance scheduling based on dynamic risk thresholds.
 
-2. **Deep Learning on Sequential Telemetry Streams:**
-   Exploring sequential deep learning architectures—specifically Long Short-Term Memory (LSTM) networks, Temporal Convolutional Networks (TCNs), or Transformer-based sequence models—to directly ingest raw multi-day telemetry streams without requiring manual rolling delta feature extraction.
+ 2. **Time-Series Baseline Models & Sequential Deep Learning:**
+   Evaluating traditional statistical time-series forecasting models (such as ARIMA/SARIMAX) as sequential baselines, while exploring advanced deep learning architectures ; specifically Long Short-Term Memory (LSTM) networks, Temporal Convolutional Networks (TCNs), or Transformer-based sequence models. This will assess whether multi-day telemetry streams can be modeled directly to capture temporal dynamics without relying on manual rolling delta feature engineering ($\Delta_7$).
 
 3. **AIOps & Real-Time Observability Integration:**
    Containerizing the inference pipeline into an operational microservice integrated directly into Kubernetes storage orchestrators and enterprise observability stacks (e.g., streaming telemetry via OpenTelemetry, Prometheus metrics collection, and Grafana alert visualization).
