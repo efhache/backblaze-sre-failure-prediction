@@ -1,11 +1,13 @@
 # Predictive Hard Drive Failure Modeling for SRE Operations
 ### A Machine Learning Approach to Infrastructure Reliability
 
+[![DOI](https://zenodo.org/badge/1333283275.svg)](https://doi.org/10.5281/zenodo.23895458)
 [![HarvardX Professional Certificate in Data Science](https://img.shields.io/badge/HarvardX-PH125.9x-A51C30.svg)](https://harvardonline.harvard.edu/program/data-science)
 [![R-Project](https://img.shields.io/badge/Language-R_4.x-276DC3.svg)](https://www.r-project.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Status](https://img.shields.io/badge/Status-Completed-success.svg)](#)
 [![OS](https://img.shields.io/badge/OS-Zorin%20OS-blueviolet.svg)](https://zorin.com/os/)
+
 
 ---
 
